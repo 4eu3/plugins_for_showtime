@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8 API
+//ver 0.8.1 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -259,19 +259,29 @@
                 if (i < JSON.data.directors.length - 1) directors += ', ';
             }
         }
-        for (i in JSON.data.files) {
-            var item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[i].url) + ':' + escape(JSON.data.files[i].title), "video", {
-                title: showtime.entityDecode(unescape(JSON.data.files[i].title)),
-                season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
-                description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
-                duration: JSON.data.info.duration ? JSON.data.info.duration : '',
-                genre: genres ? genres : '',
-                actor: actors ? actors : '',
-                director: directors ? directors : '',
-                year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
-                icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+        for ( i = 0; i < JSON.data.files[JSON.data.files.length - 1].season; i++) {
+            p(JSON.data.files);
+            page.appendItem("", "separator", {
+                title: new showtime.RichText('Сезон ' + (i + 1))
             });
-            //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
+            for (j in JSON.data.files) {
+                if (JSON.data.files[j].season == i + 1) {
+                    var item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[j].url) + ':' + escape(JSON.data.files[j].title), "video", {
+                        title: showtime.entityDecode(unescape(JSON.data.files[j].title)),
+                        season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
+                        description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
+                        duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                        genre: genres ? genres : '',
+                        actor: actors ? actors : '',
+                        director: directors ? directors : '',
+                        year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
+                        icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+                    });
+                    //code
+                }
+                //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
+            }
+            //code
         }
         setPageHeader(page, unescape(title));
     });
@@ -387,7 +397,7 @@
         if (typeof(message) === 'object') message = showtime.JSONEncode(message);
         showtime.print(message);
     }
-    
+
     function getTimeDifference(startUnix, endUnix) {
         return endUnix - startUnix; //in milliseconds
     }
