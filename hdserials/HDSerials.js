@@ -16,12 +16,16 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.7.0 API
+//ver 0.8 API
 (function(plugin) {
-    var PREFIX = 'HDSerials';
+    var plugin_info = plugin.getDescriptor();
+    var PREFIX = plugin_info.id;
     var BASE_URL = 'http://hdserials.galanov.net';
     var logo = plugin.path + "img/logo.png";
     var USER_AGENT = 'Android;HD Serials v.1.7.0;ru-RU;google Nexus 4;SDK 10;v.2.3.3(REL)';
+    plugin.addHTTPAuth("http:\/\/.*.galanov.net.*", function(authreq) {
+        authreq.setHeader("User-Agent", USER_AGENT);
+    });
 
     function trim(s) {
         s = s.replace(/(\r\n|\n|\r)/gm, "");
@@ -33,9 +37,9 @@
     function blueStr(str) {
         return '<font color="6699CC"> (' + str + ')</font>';
     }
-
     //this MUST be used at the end of the corresponding function
     //else there is no loading circle
+
     function setPageHeader(page, title) {
         if (page.metadata) {
             page.metadata.title = PREFIX + ' : ' + title;
@@ -45,52 +49,33 @@
         page.contents = "items";
         page.loading = false;
     }
-    
     var service = plugin.createService("HDSerials.ru", PREFIX + ":start", "video", true, logo);
     var settings = plugin.createSettings("HDSerials", logo, "HDSerials: Integration of the website HDSerials.ru into Showtime");
-    settings.createInfo("info", logo, "Plugin developed by Buksa \n");
-    settings.createDivider('Settings:');
+    settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     var Resolution = [
         ['0', 'Auto', true],
         ['1', '720p'],
         ['2', '480p'],
         ['3', '360p']
     ];
-    
-    settings.createBool("Show_finished", "Показывать сообщение о достижении конца директории", true, function(v) {
-        service.showEndOfDirMessage = v;
-    });
-    
+    settings.createDivider('Video Settings');
     settings.createMultiOpt("Resolution", "Разрешение", Resolution, function(v) {
         service.Resolution = v;
     });
-    
-    var requestMinDelay = [
-      [1000,'1 сек'],
-      [2000,'2 сек'],
-      [3000,'3 сек',true]
-    ];
-    
-    settings.createMultiOpt("Min.Delay", "Интервал запросов к серверу", requestMinDelay, function(v) {
+    settings.createDivider('Browser Settings');
+    settings.createInfo("info2", '', "Чем меньше значение - тем быстрее подгрузка списков в директориях с большим количеством файлов, но тем больше вероятность ошибки сервера. \n");
+    settings.createInt("Min.Delay", "Интервал запросов к серверу (default: 3 сек)", 3, 1, 10, 1, 'сек', function(v) {
         service.requestMinDelay = v;
     });
-    settings.createInfo("info2",'', "Чем меньше значение - тем быстрее подгрузка списков в директориях с большим количеством файлов, но тем больше вероятность ошибки сервера. \n");
-    
-    var requestQuantity = [
-      [10,'10'],
-      [15,'15'],
-      [20,'20',true],
- 
-    ];
-    
-    settings.createMultiOpt("requestQuantity", "Количество запрашиваемых данных в одном запросе", requestQuantity, function(v) {
+    settings.createInt("requestQuantity", "Количество запрашиваемых данных в одном запросе", 20, 10, 20, 5, '', function(v) {
         service.requestQuantity = v;
     });
-    
-    var qualityNotAvailableError = "Невозможно открыть видео в "+Resolution[service.Resolution][1]+", используется максимально доступное качество";
+    settings.createBool("Show_finished", "Показывать сообщение о достижении конца директории", true, function(v) {
+        service.showEndOfDirMessage = v;
+    });
+    var qualityNotAvailableError = "Невозможно открыть видео в " + Resolution[service.Resolution][1] + ", используется максимально доступное качество";
 
     function startPage(page) {
-        
         var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
             method: 'POST',
             headers: {
@@ -163,80 +148,69 @@
         var offset = 0;
         var counter = 0;
         var anchor = 0;
-	var lastRequest = 0,
-	    requestFinished = true,
-	    requestNumber=0;
-	
-	
-	//trying to implement a delay function to prevent server overload when fast scrolling
-	//returns value of time before next request can be made, or zero if the request can be made immediately
-	function countDelay(delay) {
-	  //showtime.print('Getting difference between:'+lastRequest+" and "+showtime.time());
-	  var timeDiff = getTimeDifference(lastRequest,showtime.time())*1000;
-	  //showtime.print("time sinse last call:"+timeDiff);
-	  if(timeDiff<delay) {
-	    //wait for the delay time to end
-	    return delay-timeDiff;
-	  }
-	  else {
-	   return 0; 
-	  }
-	  
-	}
+        var lastRequest = 0,
+            requestFinished = true,
+            requestNumber = 0;
+        //trying to implement a delay function to prevent server overload when fast scrolling
+        //returns value of time before next request can be made, or zero if the request can be made immediately
 
+        function countDelay(delay) {
+            //showtime.print('Getting difference between:' + lastRequest + " and " + showtime.time());
+            var timeDiff = getTimeDifference(lastRequest, showtime.time()) * 1000;
+            //showtime.print("time sinse last call:" + timeDiff);
+            if (timeDiff < delay) {
+                //wait for the delay time to end
+                return delay - timeDiff;
+            } else {
+                return 0;
+            }
+        }
 
         function loader() {
-	  if(!requestFinished) {
-	    //showtime.print("Request not finished yet, exiting");
-	    return false;
-	  }
-	  //showtime.print(video_count+" "+counter);
-            if (parseInt(video_count) <= counter) {
-	      if(service.showEndOfDirMessage && requestNumber>2) {
-		showtime.notify("Достигнут конец директории",2);
-	      }
-	      return false;
-	    }
-	    var JSON;
-	      
-	      var delay = countDelay(service.requestMinDelay);
-	      
-	      var loadJSON = function() {
-		try {
-		lastRequest = showtime.time();
-		requestFinished = false;
-		//showtime.print("Time to make some requests now!");
-		var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
-		    method: 'POST',
-		    headers: {
-			'User-Agent': USER_AGENT
-		    },
-		    args: {
-			id: 'filter-videos',
-			category: category_id,
-			fresh: 1,
-			start: offset,
-			limit: service.requestQuantity
-		    }
-		}));
-		requestFinished = true;
-		requestNumber++;
-		//showtime.print("Request finished!. Got "+JSON.data.length);
-		return JSON;
-		}
-		catch(err) {
-		 showtime.notify("Подгрузка контента не удалась. Возможно, сервер не ответил вовремя.",5);
-		 return false;
-		}
-	      };
-	      
-		  //showtime.print("Let's wait "+delay+" msec before making a request!");
-		  showtime.sleep(delay);
-		  JSON = loadJSON();
-		  
-		  if(!JSON) return false;
-	      
-	      
+            if (!requestFinished) {
+                //showtime.print("Request not finished yet, exiting");
+                return false;
+            }
+            //showtime.print(video_count + " " + counter);
+            if (parseInt(video_count, 10) <= counter) {
+                if (service.showEndOfDirMessage && requestNumber > 2) {
+                    showtime.notify("Достигнут конец директории", 2);
+                }
+                return false;
+            }
+            var JSON;
+            var delay = countDelay(service.requestMinDelay * 1000);
+            var loadJSON = function() {
+                    try {
+                        lastRequest = showtime.time();
+                        requestFinished = false;
+                        //showtime.print("Time to make some requests now!");
+                        var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
+                            method: 'POST',
+                            headers: {
+                                'User-Agent': USER_AGENT
+                            },
+                            args: {
+                                id: 'filter-videos',
+                                category: category_id,
+                                fresh: 1,
+                                start: offset,
+                                limit: service.requestQuantity
+                            }
+                        }));
+                        requestFinished = true;
+                        requestNumber++;
+                        //showtime.print("Request finished!. Got " + JSON.data.length);
+                        return JSON;
+                    } catch (err) {
+                        showtime.notify("Подгрузка контента не удалась. Возможно, сервер не ответил вовремя.", 5);
+                        return false;
+                    }
+                };
+            //showtime.print("Let's wait " + delay + " msec before making a request!");
+            showtime.sleep(delay);
+            JSON = loadJSON();
+            if (!JSON) return false;
             for (var i in JSON.data) {
                 page.appendItem(PREFIX + ':' + JSON.id + ':' + JSON.data[i].id + ':' + escape(JSON.data[i].title_ru + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : "")), "video", {
                     title: showtime.entityDecode(unescape(JSON.data[i].title_ru)) + (JSON.data[i].title_en ? " / " + showtime.entityDecode(JSON.data[i].title_en) : "") + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : ""),
@@ -252,8 +226,6 @@
         setPageHeader(page, unescape(title));
         page.paginator = loader;
     });
-    
-    
     plugin.addURI(PREFIX + ":filter-videos:(.*):(.*)", function(page, id, title) {
         var i, genres, actors, directors;
         var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
@@ -305,8 +277,8 @@
     });
     // Play links
     plugin.addURI(PREFIX + ":video:(.*):(.*)", function(page, url, title) {
-	//no loading circle was present, forcing
-	page.loading = true;
+        //no loading circle was present, forcing
+        page.loading = true;
         var video = get_video_link(unescape(url));
         if (showtime.probe(video).result === 0) {
             page.type = "video";
@@ -377,34 +349,32 @@
                 result_url = 'hls:' + JSON.manifest_m3u8;
                 break;
             case '1':
-	      //not each and every video contains 720p link
-	      //as a workaround, play best quality available
-	      //or m[2] will be undefined. This will give us 403 error on playback.
-	      if(m[2]) {
-		//well, same here
-		//except I've never seen such videos. Just in case...
-                result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[2];
-	      }
-	      else {
-		result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length-1];
-		showtime.notify(qualityNotAvailableError,5);
-	      }
+                //not each and every video contains 720p link
+                //as a workaround, play best quality available
+                //or m[2] will be undefined. This will give us 403 error on playback.
+                if (m[2]) {
+                    //well, same here
+                    //except I've never seen such videos. Just in case...
+                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[2];
+                } else {
+                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length - 1];
+                    showtime.notify(qualityNotAvailableError, 5);
+                }
                 break;
             case '2':
-	      if(m[1]) {
-                result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[1];
-	      }
-	      else {
-		result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length-1];
-	      }
+                if (m[1]) {
+                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[1];
+                } else {
+                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length - 1];
+                }
                 break;
             case '3':
-	      //let's assume that at least one item is available
+                //let's assume that at least one item is available
                 result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[0];
                 break;
             }
         }
-        showtime.print("Video Link: " + result_url);
+        //showtime.print("Video Link: " + result_url);
         return result_url;
     }
 
@@ -416,6 +386,10 @@
     function p(message) {
         if (typeof(message) === 'object') message = showtime.JSONEncode(message);
         showtime.print(message);
+    }
+    
+    function getTimeDifference(startUnix, endUnix) {
+        return endUnix - startUnix; //in milliseconds
     }
     // Add to RegExp prototype
     RegExp.prototype.execAll = function(string) {
@@ -435,6 +409,7 @@
     plugin.addURI(PREFIX + ":start", startPage);
     plugin.addSearcher(PREFIX + " - Videos", plugin.path + "logo.png", function(page, query) {
         try {
+            page.entries = 0;
             var offset = 0;
             var loader = function loader() {
                     var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
@@ -461,16 +436,11 @@
                     offset += 20;
                     return !JSON.endOfData;
                 };
-	    setPageHeader(page, query);
+            setPageHeader(page, query);
             loader();
             page.paginator = loader;
         } catch (err) {
-            showtime.trace('HDSerials.ru - Ошибка поиска: ' + err);
+            showtime.trace(PREFIX + ' - Ошибка поиска: ' + err);
         }
     });
-    
-    function getTimeDifference(startUnix,endUnix) {
-  return endUnix-startUnix; //in milliseconds
-}
-    
 })(this);

@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.4.6
+//ver 0.5
 (function(plugin) {
     var PREFIX = 'ororo:';
     // bazovyj adress saita
@@ -78,9 +78,16 @@
             }
         });
     }
+    //set header and cookies for ororo.tv
+    plugin.addHTTPAuth("http:\/\/.*ororo.tv.*", function(authreq) {
+        authreq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
+        authreq.setCookie("video", "true");
+    });
     //First level start page
     plugin.addURI(PREFIX + "start", function(page) {
-        var i, v;
+        var i, v, remember_user_token;
+        if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
+        else page.error("TOS not accepted. plugin disabled");
         page.metadata.glwview = plugin.path + "views/array2.view";
         try {
             page.metadata.logo = logo;
@@ -88,19 +95,83 @@
             pageMenu(page);
             items = [];
             items_tmp = [];
-            v = showtime.httpReq(BASE_URL);
-            if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
-            else page.error("TOS not accepted. plugin disabled");
-            // p(v.toString())
+            v = showtime.httpReq(BASE_URL + 'users/sign_in', {
+                debug: true,
+                //noFollow: true,
+                headers: {
+                    'Host': 'ororo.tv',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate'
+                }
+            });
+            if (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)) {
+                var authenticity_token = (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)[1]);
+                var reason = "Login required";
+                var do_query = false;
+                while (1) {
+                    var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
+                    if (!credentials) {
+                        if (!do_query) {
+                            do_query = true;
+                        }
+                    }
+                    if (credentials.rejected) return;
+                    if (credentials.username === "" || credentials.password === "") {
+                        if (!do_query) {
+                            do_query = true;
+                        }
+                    }
+                    v = showtime.httpReq('http://ororo.tv/users/sign_in', {
+                        debug: true,
+                        noFollow: true,
+                        postdata: {
+                            utf8: '✓',
+                            authenticity_token: authenticity_token,
+                            'user[email]': credentials.username,
+                            'user[password]': credentials.password,
+                            'user[remember_me]': 1,
+                            commit: '%D0%92%D0%BE%D0%B9%D1%82%D0%B8'
+                        },
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.4 (KHTML, like Gecko) Chrome/22.0.1106.240 YaBrowser/1.5.1106.240 Safari/537.4',
+                            'Host': 'ororo.tv',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'ru,en;q=0.9'
+                        }
+                    });
+                    if (v.multiheaders['Set-Cookie']) {
+                        remember_user_token = (getCookie('remember_user_token', v.multiheaders) ? getCookie('remember_user_token', v.multiheaders) : '');
+                    }
+                    if (remember_user_token) {
+                        v = showtime.httpReq(BASE_URL, {
+                            debug: true,
+                            //noFollow: true,
+                            headers: {
+                                'Host': 'ororo.tv',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
+                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                'Accept-Language': 'en-US,en;q=0.5',
+                                'Accept-Encoding': 'gzip, deflate',
+                                'Referer': 'http://ororo.tv/users/sign_in' //,
+                                // 'Cookie': this.id+'; '+this._ororo_session+'; '+this.remember_user_token
+                            }
+                        });
+                        break;
+                    } else {
+                        reason = "Wrong username/password.";
+                        do_query = true;
+                    }
+                }
+            }
             page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
-            //var re = /<div class='index show'[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?title'>([^<]+)<br>(.+?)<[\S\s]+?<p>([^<]+)/g;
-            //var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?title'>([^<]+)<br>(.+?)<[\S\s]+?<p>([^<]+)/g
-            var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?icon-star[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?title'>([^<]+)<br>(.+?)<[\S\s]+?<p>([^<]+)/g;
+            var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?icon-star[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
             var m = re.execAll(v);
             for (i = 0; i < m.length; i++) {
                 var item = page.appendItem(PREFIX + "page:" + m[i][2], "video", {
-                    title: new showtime.RichText(trim(m[i][5]) + ' | ' + trim(m[i][6])),
-                    description: new showtime.RichText(m[i][7]),
+                    title: new showtime.RichText(trim(m[i][5]) /*+ ' | ' + trim(m[i][6])*/ ),
+                    description: new showtime.RichText(m[i][6]),
                     icon: BASE_URL + m[i][3],
                     rating: m[i][4] * 10
                 });
@@ -163,8 +234,17 @@
         page.metadata.background = plugin.path + "views/img/background.png";
         page.metadata.backgroundAlpha = 0.5;
         try {
-            v = showtime.httpReq(BASE_URL + link).toString();
-            //var entries = [];
+            v = showtime.httpReq(BASE_URL + link, {
+                debug: true,
+                headers: {
+                    'Host': 'ororo.tv',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Referer': 'http://ororo.tv/' //,
+                    //   'Cookie':this.id+'; '+this._ororo_session+'; '+this.remember_user_token
+                }
+            });
             var title = showtime.entityDecode(trim(match(/<img alt="(.+?)" id="poster"/, v, 1)));
             var year = parseInt(match(/<div id='year'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
@@ -238,9 +318,16 @@
     function get_video_link(url) {
         var video = [];
         try {
-            var v = showtime.httpReq(BASE_URL + url).toString();
-            t(v);
-            //p(v)
+            p(BASE_URL + url);
+            var v = showtime.httpReq(BASE_URL + url, {
+                debug: true,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0' //,
+                    //    'Cookie': this.id+"; "+ this._ororo_session+'; '+remember_user_token+'; video=true;',
+                    //   'Location':'http://static-ua.ororo.tv/uploads/video/file/15896/Almost.Human.S01E03.HDTV.x264-LOL.mp4'
+                }
+            });
+            p(v);
             //video.url = match(/video.tag.src = webm \? "\/(.+?)"/, v, 1) ? BASE_URL + match(/video.tag.src = webm \? "\/(.+?)"/, v, 1) : match(/video.tag.src = webm \? "(.+?)"/, v, 1);
             //video.sub = BASE_URL + match(/src: "\/(.+?)"/, v, 1);
             video.url = match(/<source src='\/(.*?)' type='video/, v, 1) ? BASE_URL + match(/<source src='\/(.*?)' type='video/, v, 1) : match(/<source src='(.*?)' type='video/, v, 1);
@@ -364,6 +451,13 @@
         }
         return matches;
     };
+
+    function getCookie(name, multiheaders) {
+        var cookie = showtime.JSONEncode(multiheaders['Set-Cookie']);
+        p('cookie: ' + cookie);
+        var matches = cookie.match(new RegExp('(?:^|; |","|")' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+        return matches ? name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=' + decodeURIComponent(matches[1]) : false;
+    }
 
     function match(re, st, i) {
         i = typeof i !== 'undefined' ? i : 0;

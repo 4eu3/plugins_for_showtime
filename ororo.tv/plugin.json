@@ -1,9 +1,9 @@
 {
 	"id": "ororo",
-	"version": "0.4.6",
+	"version": "0.5",
 	"type": "javascript",
 	"author": "Buksa",
-	"showtimeVersion": "4.3.279",
+	"showtimeVersion": "4.3.567",
 	"title": "ororo.tv",
 	"synopsis": "Showtime plugin to watch tv shows from ororo.tv",
 	"description":"<p>Ororo.tv Showtime plugin is the integration of the website ororo.tv into Showtime.\n\nTV Shows in English with English subtitles<p>",
