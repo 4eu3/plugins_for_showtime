@@ -16,14 +16,12 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5
+//ver 0.5.1
 (function(plugin) {
-    var PREFIX = 'ororo:';
-    // bazovyj adress saita
+    var plugin_info = plugin.getDescriptor();
+    var PREFIX = plugin_info.id;
     var BASE_URL = 'http://ororo.tv/';
-    //logo
-    var logo = plugin.path + 'logo.png';
-    //tos
+    var logo = plugin.path + plugin_info.icon;
     var tos = 'The developer has no affiliation with the sites what so ever.\n';
     tos += 'Nor does he receive money or any other kind of benefits for them.\n\n';
     tos += 'The software is intended solely for educational and testing purposes,\n';
@@ -40,16 +38,17 @@
     tos += "plugin is not licensed, approved or endorsed by any online resource\n ";
     tos += "proprietary. Do you accept this terms?";
     // Register a service (will appear on home page)
-    var service = plugin.createService("Ororo.tv", PREFIX + "start", "video", true, logo);
+    var service = plugin.createService("Ororo.tv", PREFIX + ":start", "video", true, logo);
+    //settings
+    var settings = plugin.createSettings("Ororo.tv", logo, plugin_info.synopsis);
     var main_menu_order = plugin.createStore('main_menu_order', true);
     var items = [];
     var items_tmp = [];
-    //if (!main_menu_order.ready) {
+/*if (!main_menu_order.ready) {
     //    main_menu_order.ready = "1";
     //}
-    //settings
-    var settings = plugin.createSettings("Ororo.tv", logo, "Online Videos");
-    settings.createInfo("info", logo, "Plugin developed by Buksa \n");
+    */
+    settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
     settings.createBool("tosaccepted", "Accepted TOS (available in opening the plugin)", false, function(v) {
         service.tosaccepted = v;
@@ -84,40 +83,47 @@
         authreq.setCookie("video", "true");
     });
     //First level start page
-    plugin.addURI(PREFIX + "start", function(page) {
+    plugin.addURI(PREFIX + ":start", function(page) {
         var i, v, remember_user_token;
         if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
-        else page.error("TOS not accepted. plugin disabled");
+        else {
+            page.error("TOS not accepted. plugin disabled");
+            return;
+        }
         page.metadata.glwview = plugin.path + "views/array2.view";
-        try {
-            page.metadata.logo = logo;
-            page.metadata.title = PREFIX;
-            pageMenu(page);
-            items = [];
-            items_tmp = [];
-            v = showtime.httpReq(BASE_URL + 'users/sign_in', {
-                debug: true,
-                //noFollow: true,
-                headers: {
-                    'Host': 'ororo.tv',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate'
-                }
-            });
-            if (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)) {
-                var authenticity_token = (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)[1]);
-                var reason = "Login required";
-                var do_query = false;
-                while (1) {
-                    var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
+        page.metadata.logo = logo;
+        page.metadata.title = PREFIX;
+        pageMenu(page);
+        items = [];
+        items_tmp = [];
+        v = showtime.httpReq(BASE_URL + 'users/sign_in', {
+            debug: true,
+            //noFollow: true,
+            headers: {
+                'Host': 'ororo.tv',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate'
+            }
+        });
+        if (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)) {
+            var authenticity_token = (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)[1]);
+            var reason = "Login required";
+            var do_query = false;
+            while (1) {
+                var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
+                if (credentials) {
+                    if (credentials.rejected) {
+                        page.loading = false;
+                        page.error("This plugin requires the account to be logged in. You can get at www.ororo.tv plugin disabled");
+                        return;
+                    }
                     if (!credentials) {
                         if (!do_query) {
                             do_query = true;
                         }
                     }
-                    if (credentials.rejected) return;
                     if (credentials.username === "" || credentials.password === "") {
                         if (!do_query) {
                             do_query = true;
@@ -159,77 +165,78 @@
                             }
                         });
                         break;
-                    } else {
-                        reason = "Wrong username/password.";
-                        do_query = true;
                     }
                 }
+                reason = "Wrong username/password.";
+                do_query = true;
             }
-            page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
-            var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?icon-star[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
-            var m = re.execAll(v);
-            for (i = 0; i < m.length; i++) {
-                var item = page.appendItem(PREFIX + "page:" + m[i][2], "video", {
-                    title: new showtime.RichText(trim(m[i][5]) /*+ ' | ' + trim(m[i][6])*/ ),
-                    description: new showtime.RichText(m[i][6]),
-                    icon: BASE_URL + m[i][3],
-                    rating: m[i][4] * 10
-                });
-                item.title = trim(m[i][5]);
-                item.newest = m[i][1];
-                item.rating = +m[i][4];
-                items.push(item);
-                items_tmp.push(item);
+        }
+        page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
+        var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?icon-star[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
+        var m = re.execAll(v);
+        for (i = 0; i < m.length; i++) {
+            var item = page.appendItem(PREFIX + ":page:" + m[i][2], "video", {
+                title: new showtime.RichText(trim(m[i][5]) /*+ ' | ' + trim(m[i][6])*/ ),
+                description: new showtime.RichText(m[i][6]),
+                icon: BASE_URL + m[i][3],
+                rating: m[i][4] * 10
+            });
+            item.title = trim(m[i][5]);
+            item.newest = m[i][1];
+            item.rating = +m[i][4];
+            items.push(item);
+            items_tmp.push(item);
+        }
+        try {
+            for (i in items) {
+                items[i].id = i;
             }
-            try {
-                for (i in items) {
-                    items[i].id = i;
-                }
-                //if (!main_menu_order.order) {
-                items_tmp = page.getItems();
-                //var its = [];
-                //for (i in items) {
-                //    items[i].orig_index = i;
-                //    its.push(items[i]);
-                //}
-                //its.sort(function(a, b) {
-                //    return a.title > b.title;
-                //});
-                for (i = 0; i < items_tmp.length; i++) {
-                    if (!items_tmp[i].id) delete items_tmp[i];
-                }
-                items_tmp.sort(function(a, b) {
-                    return b.newest > a.newest;
-                });
-                //       main_menu_order.order = showtime.JSONEncode(items_tmp);
-                //    }
-                //    main_menu_order.order;
-                //var order = showtime.JSONDecode(main_menu_order.order);
-                var order = (items_tmp);
-                for (i in order) {
-                    items[order[i].id].moveBefore(i);
-                }
-                page.reorderer = function(item, before) {
-                    item.moveBefore(before);
-                    var items = page.getItems();
-                    for (var i = 0; i < items.length; i++) {
-                        if (!items[i].id) delete items[i];
-                    }
-                    main_menu_order.order = showtime.JSONEncode(items);
-                };
-            } catch (ex) {
-                t("Error while parsing main menu order");
-                e(ex);
+            //if (!main_menu_order.order) {
+            items_tmp = page.getItems();
+            //var its = [];
+            //for (i in items) {
+            //    items[i].orig_index = i;
+            //    its.push(items[i]);
+            //}
+            //its.sort(function(a, b) {
+            //    return a.title > b.title;
+            //});
+            for (i = 0; i < items_tmp.length; i++) {
+                if (!items_tmp[i].id) delete items_tmp[i];
             }
-            page.type = "directory";
-            page.contents = "items";
+            items_tmp.sort(function(a, b) {
+                return b.newest > a.newest;
+            });
+/*/       main_menu_order.order = showtime.JSONEncode(items_tmp);
+            //    }
+            //    main_menu_order.order;
+            //var order = showtime.JSONDecode(main_menu_order.order);
+ */
+            var order = (items_tmp);
+            for (i in order) {
+                items[order[i].id].moveBefore(i);
+            }
+            page.reorderer = function(item, before) {
+                item.moveBefore(before);
+                var items = page.getItems();
+                for (var i = 0; i < items.length; i++) {
+                    if (!items[i].id) delete items[i];
+                }
+                main_menu_order.order = showtime.JSONEncode(items);
+            };
         } catch (ex) {
-            page.error("Failed to process page");
+            t("Error while parsing main menu order");
             e(ex);
         }
+        page.type = "directory";
+        page.contents = "items";
+        //} catch (ex) {
+        //    page.error("Failed to process page");
+        //    e(ex);
+        //}
         page.loading = false;
     });
-    plugin.addURI(PREFIX + "page:(.*)", function(page, link) {
+    plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
         var i, v, item;
         page.metadata.background = plugin.path + "views/img/background.png";
         page.metadata.backgroundAlpha = 0.5;
@@ -249,7 +256,7 @@
             var year = parseInt(match(/<div id='year'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
             var duration = parseInt(match(/<div id='length'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
-            var genre = trim(match(/Жанры:<\/span>([\s\S]+?)</, v, 1));
+            var genre = trim(match(/<div id='genres'>[\s\S]+?:<\/span>([\s\S]+?)</, v, 1));
             ////get_fanart(page,metadata.title)
             var icon = match(/id="poster" src="\/(.+?)"/, v, 1);
             page.metadata.logo = BASE_URL + icon;
@@ -265,7 +272,7 @@
                             title: new showtime.RichText('Season ' + m[i][1])
                         });
                     }
-                    item = page.appendItem(PREFIX + "play:" + m[i][3] + ':' + escape(m[i][4] + '|' + title + '|' + parseInt(m[i][1], 10) + '|' + parseInt(m[i][2], 10)), "video", {
+                    item = page.appendItem(PREFIX + ":play:" + m[i][3] + ':' + escape(m[i][4] + '|' + title + '|' + parseInt(m[i][1], 10) + '|' + parseInt(m[i][2], 10)), "video", {
                         title: new showtime.RichText(m[i][4]),
                         icon: BASE_URL + icon,
                         description: match(/plot'>([^<]+)/, m[i][5], 1) ? new showtime.RichText(match(/plot'>([^<]+)/, m[i][5], 1)) : '',
@@ -291,10 +298,9 @@
         page.loading = false;
     });
     // Play links
-    plugin.addURI(PREFIX + "play:(.*):(.*)", function(page, url, title) {
+    plugin.addURI(PREFIX + ":play:(.*):(.*)", function(page, url, title) {
+	page.loading = true;
         page.metadata.logo = logo;
-        page.loading = false;
-        page.type = "video";
         var s = unescape(title).split('|');
         var video = get_video_link(url);
         var videoparams = {
@@ -302,7 +308,7 @@
             title: unescape(s[1]),
             season: s[2],
             episode: s[3],
-            canonicalUrl: PREFIX + "play:" + url + ":" + title,
+            canonicalUrl: PREFIX + ":play:" + url + ":" + title,
             sources: [{
                 url: video.url.replace('.webm', service.Format)
             }],
@@ -313,6 +319,8 @@
             }]) : ''
         };
         page.source = "videoparams:" + showtime.JSONEncode(videoparams);
+        page.loading = false;
+        page.type = "video";
     });
 
     function get_video_link(url) {
