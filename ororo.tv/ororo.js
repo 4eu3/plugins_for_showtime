@@ -53,6 +53,10 @@
     settings.createBool("tosaccepted", "Accepted TOS (available in opening the plugin)", false, function(v) {
         service.tosaccepted = v;
     });
+        settings.createBool("arrayview", "Show array view", false, function(v) {
+        service.arrayview = v;
+    });
+    
     settings.createBool("thetvdb", "Show more information using thetvdb", false, function(v) {
         service.thetvdb = v;
     });
@@ -90,7 +94,8 @@
             page.error("TOS not accepted. plugin disabled");
             return;
         }
-        page.metadata.glwview = plugin.path + "views/array2.view";
+	if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
+	
         page.metadata.logo = logo;
         page.metadata.title = PREFIX;
         pageMenu(page);
