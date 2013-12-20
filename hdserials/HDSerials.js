@@ -259,6 +259,7 @@
                 if (i < JSON.data.directors.length - 1) directors += ', ';
             }
         }
+        if (JSON.data.files.length > 1){
         for ( i = 0; i < JSON.data.files[JSON.data.files.length - 1].season; i++) {
             p(JSON.data.files);
             page.appendItem("", "separator", {
@@ -283,6 +284,23 @@
             }
             //code
         }
+        } else{
+                    for (i in JSON.data.files) {
+            var item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[i].url) + ':' + escape(JSON.data.files[i].title), "video", {
+                title: showtime.entityDecode(unescape(JSON.data.files[i].title)),
+                season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
+                description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
+                duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                genre: genres ? genres : '',
+                actor: actors ? actors : '',
+                director: directors ? directors : '',
+                year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
+                icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+            });
+            //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
+        }
+        }
+        
         setPageHeader(page, unescape(title));
     });
     // Play links
