@@ -1,0 +1,14 @@
+{
+	"id": "iLive",
+	"version": "0.4",
+	"type": "javascript",
+	"author": "Buksa",
+	"showtimeVersion": "4.3.257",
+	"title": "iLive",
+	"synopsis": "iLive - Live Streaming",
+	"description":"<p>iLive - Showtime plugin is the integration of the website www.ilive.to into Showtime</p>",
+	"homepage":"https://github.com/Buksa/plugins_for_showtime/ilive",
+	"category": "TV",
+	"icon": "logo.png",
+	"file": "iLive.js"
+}
