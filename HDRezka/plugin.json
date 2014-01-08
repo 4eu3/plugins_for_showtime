@@ -1,0 +1,14 @@
+{
+	"id": "HDRezka",
+	"version": "0.2",
+	"type": "javascript",
+	"author": "Buksa",
+	"showtimeVersion": "4.3.257",
+	"title": "HDRezka",
+	"synopsis": "HDRezka - онлайн фильмы в хорошем качестве",
+	"description":"<p>HDRezka - Showtime plugin is the integration of the website <a href=\"http://hdrezka.tv\">HDRezka.tv</a> into Showtime",
+	"homepage":"https://github.com/Buksa/plugins_for_showtime/HDRezka",
+	"category": "video",
+	"icon": "logo.png",
+	"file": "HDRezka.js"
+}
