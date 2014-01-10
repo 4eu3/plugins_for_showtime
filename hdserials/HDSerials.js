@@ -1,7 +1,7 @@
 /**
  *  HDSerials plugin for Showtime
  *
- *  Copyright (C) 2013 Buksa, Wain
+ *  Copyright (C) 2014 Buksa, Wain
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8.1 API
+//ver 0.8.3 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -227,7 +227,7 @@
         page.paginator = loader;
     });
     plugin.addURI(PREFIX + ":filter-videos:(.*):(.*)", function(page, id, title) {
-        var i, genres, actors, directors;
+        var i, item, genres, actors, directors, countries;
         var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
             method: 'POST',
             headers: {
@@ -245,6 +245,13 @@
                 if (i < JSON.data.genres.length - 1) genres += ', ';
             }
         }
+        if (JSON.data.countries) {
+            countries = "";
+            for (i in JSON.data.countries) {
+                countries += JSON.data.countries[i].title_ru;
+                if (i < JSON.data.countries.length - 1) countries += ', ';
+            }
+        }
         if (JSON.data.actors) {
             actors = "";
             for (i in JSON.data.actors) {
@@ -259,48 +266,47 @@
                 if (i < JSON.data.directors.length - 1) directors += ', ';
             }
         }
-        if (JSON.data.files.length > 1){
-        for ( i = 0; i < JSON.data.files[JSON.data.files.length - 1].season; i++) {
-            p(JSON.data.files);
-            page.appendItem("", "separator", {
-                title: new showtime.RichText('Сезон ' + (i + 1))
-            });
-            for (j in JSON.data.files) {
-                if (JSON.data.files[j].season == i + 1) {
-                    var item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[j].url) + ':' + escape(JSON.data.files[j].title), "video", {
-                        title: showtime.entityDecode(unescape(JSON.data.files[j].title)),
-                        season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
-                        description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
-                        duration: JSON.data.info.duration ? JSON.data.info.duration : '',
-                        genre: genres ? genres : '',
-                        actor: actors ? actors : '',
-                        director: directors ? directors : '',
-                        year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
-                        icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
-                    });
-                    //code
+        if (JSON.data.files.length > 1) {
+            for (i = 0; i < JSON.data.files[JSON.data.files.length - 1].season; i++) {
+                page.appendItem("", "separator", {
+                    title: new showtime.RichText('Сезон ' + (i + 1))
+                });
+                for (j in JSON.data.files) {
+                    if (JSON.data.files[j].season == i + 1) {
+                        item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[j].url) + ':' + escape(JSON.data.files[j].title), "video", {
+                            title: showtime.entityDecode(unescape(JSON.data.files[j].title)),
+                            season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
+                            description: new showtime.RichText((JSON.data.info.translation ? coloredStr('Перевод: ', orange) + JSON.data.info.translation + '\n' : '') + (countries ? coloredStr('Страна: ', orange) + countries + '\n' : '') + (directors ? coloredStr('Режиссер: ', orange) + directors + ' ' : '') + (actors ? '\n' + coloredStr('В ролях актеры: ', orange) + actors + '\n' : '') + (JSON.data.info.description ? coloredStr('Описание: ', orange) + JSON.data.info.description : '')),
+                            duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                            rating: JSON.data.info.hd_rating * 10,
+                            genre: genres ? genres : '',
+                            actor: actors ? actors : '',
+                            director: directors ? directors : '',
+                            year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
+                            icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+                        });
+                        //code
+                    }
+                    //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
                 }
+                //code
+            }
+        } else {
+            for (i in JSON.data.files) {
+                item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[i].url) + ':' + escape(JSON.data.files[i].title), "video", {
+                    title: showtime.entityDecode(unescape(JSON.data.files[i].title)),
+                    season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
+                    description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
+                    duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                    genre: genres ? genres : '',
+                    actor: actors ? actors : '',
+                    director: directors ? directors : '',
+                    year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
+                    icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+                });
                 //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
             }
-            //code
         }
-        } else{
-                    for (i in JSON.data.files) {
-            var item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[i].url) + ':' + escape(JSON.data.files[i].title), "video", {
-                title: showtime.entityDecode(unescape(JSON.data.files[i].title)),
-                season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
-                description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
-                duration: JSON.data.info.duration ? JSON.data.info.duration : '',
-                genre: genres ? genres : '',
-                actor: actors ? actors : '',
-                director: directors ? directors : '',
-                year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
-                icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
-            });
-            //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
-        }
-        }
-        
         setPageHeader(page, unescape(title));
     });
     // Play links
@@ -383,22 +389,22 @@
                 if (m[2]) {
                     //well, same here
                     //except I've never seen such videos. Just in case...
-                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[2];
+                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[2]);
                 } else {
-                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length - 1];
+                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[m.length - 1]);
                     showtime.notify(qualityNotAvailableError, 5);
                 }
                 break;
             case '2':
                 if (m[1]) {
-                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[1];
+                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[1]);
                 } else {
-                    result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[m.length - 1];
+                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[m.length - 1]);
                 }
                 break;
             case '3':
                 //let's assume that at least one item is available
-                result_url = 'hls:' + JSON.manifest_m3u8.split('mbr')[0] + m[0];
+                result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[0]);
                 break;
             }
         }
@@ -418,6 +424,15 @@
 
     function getTimeDifference(startUnix, endUnix) {
         return endUnix - startUnix; //in milliseconds
+    }
+    const blue = "6699CC", orange = "FFA500";
+
+    function colorStr(str, color) {
+        return '<font color="' + color + '">(' + str + ')</font>';
+    }
+
+    function coloredStr(str, color) {
+        return '<font color="' + color + '">' + str + '</font>';
     }
     // Add to RegExp prototype
     RegExp.prototype.execAll = function(string) {
