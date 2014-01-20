@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.2
+//ver 0.3
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -77,7 +77,7 @@
         });
         v = showtime.httpReq(BASE_URL + '/films/').toString();
         m = re.execAll(v);
-        for (i = 0; i < 6; i++) {
+        for (i = 0; i < 7; i++) {
             page.appendItem(PREFIX + ":page:" + m[i][1], "video", {
                 title: new showtime.RichText(m[i][3]),
                 description: new showtime.RichText(m[i][4]),
@@ -85,7 +85,7 @@
                 year: +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][4], 1)
             });
         }
-        page.appendItem(PREFIX + ":index:" + '/films/', "directory", {
+        page.appendItem(PREFIX + ":sort:" + '/films/', "directory", {
             title: ('Дальше больше') + ' ►',
             icon: logo
         });
@@ -96,7 +96,7 @@
         v = showtime.httpReq(BASE_URL + '/series/').toString();
         //re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)/g;
         m = re.execAll(v);
-        for (i = 0; i < 6; i++) {
+        for (i = 0; i < 7; i++) {
             page.appendItem(PREFIX + ":page:" + m[i][1], "video", {
                 title: new showtime.RichText(m[i][3]),
                 description: new showtime.RichText(m[i][4]),
@@ -104,7 +104,7 @@
                 year: +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][4], 1)
             });
         }
-        page.appendItem(PREFIX + ":index:" + '/series/', "directory", {
+        page.appendItem(PREFIX + ":sort:" + '/series/', "directory", {
             title: ('Дальше больше') + ' ►',
             icon: logo
         });
@@ -115,7 +115,7 @@
         v = showtime.httpReq(BASE_URL + '/cartoons/').toString();
         //re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)/g;
         m = re.execAll(v);
-        for (i = 0; i < 6; i++) {
+        for (i = 0; i < 7; i++) {
             page.appendItem(PREFIX + ":page:" + m[i][1], "video", {
                 title: new showtime.RichText(m[i][3]),
                 description: new showtime.RichText(m[i][4]),
@@ -123,7 +123,7 @@
                 year: +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][4], 1)
             });
         }
-        page.appendItem(PREFIX + ":index:" + '/cartoons/', "directory", {
+        page.appendItem(PREFIX + ":sort:" + '/cartoons/', "directory", {
             title: ('Дальше больше') + ' ►',
             icon: logo
         });
@@ -132,25 +132,29 @@
         page.loading = false;
     });
     //Second level 
-    plugin.addURI(PREFIX + ":index:(.*)", function(page, link) {
+    plugin.addURI(PREFIX + ":index:(.*):(.*)", function(page, link, filter) {
         var re, v, m;
         // page.contents = "items";
         page.type = "directory";
         page.metadata.logo = plugin.path + "logo.png";
         v = showtime.httpReq(BASE_URL + link).toString();
-        page.metadata.title = new showtime.RichText(PREFIX + ' | ' + (/<title>(.*?)<\/title>/.exec(v)[1]));
         re = /<title>(.*?)<\/title>/;
         m = re.exec(v);
-        page.appendItem(PREFIX + ':start', 'directory', {
-            title: new showtime.RichText('сортировка по : ' + m[1])
+        page.metadata.title = new showtime.RichText(PREFIX + ' | ' + (m[1].replace('Смотреть ', '').replace(' в 720p hd', '.')));
+        page.appendItem(PREFIX + ':select:' + link, 'directory', {
+            title: new showtime.RichText('сортировка по : ' + (m[1].replace('Смотреть ', '').replace(' в 720p hd', '.')))
         });
         var offset = 1;
 
         function loader() {
-            var v = showtime.httpReq(BASE_URL + link + 'page/' + offset + '/').toString();
+            var v = showtime.httpReq(BASE_URL + link + 'page/' + offset + '/', {
+                args: {
+                    filter: filter
+                }
+            }).toString();
             p(BASE_URL + link + 'page/' + offset + '/');
             var has_nextpage = false;
-            var m = v.match(/<a href="http:\/\/hdrezka.tv(.+?)"><span class="b-navigation__next i-sprt">.*<\/span><\/a>/);
+            var m = v.match(/href="http:\/\/hdrezka.tv(.+?)"><span class="b-navigation__next i-sprt">.*<\/span><\/a>/);
             if (m) has_nextpage = true;
             re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div>(.+?)<\/div>/g;
             m = re.execAll(v);
@@ -187,7 +191,7 @@
             data.eng_title = md.eng_title;
             md.icon = match(/<img itemprop="image" src="(.+?)"/, v, 1);
             md.rating = +match(/<span class="b-post__info_rates imdb">IMDb:[\S\s]+?([0-9]+(?:\.[0-9]*)?)<\/span>/, v, 1);
-            md.year = +match(/Дата выхода:[\S\s]+?([0-9]+(?:\.[0-9]*)?) года/, v, 1);
+            md.year = +match(/http:\/\/hdrezka.tv\/year\/([^/]+)/, v, 1);
             data.year = md.year;
             md.slogan = match(/>Слоган:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.rel_date = match(/>Дата выхода:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
@@ -201,12 +205,12 @@
             page.metadata.title = md.title + ' (' + md.year + ')';
             //Трейлер:
             page.appendItem("", "separator", {
-                title: new showtime.RichText('Трейлер')
+                title: new showtime.RichText('Трейлер:')
             });
             var trailer = match(/http:\\\/\\\/www.youtube.com\\\/embed\\\/(.+?)\?iv_load_policy/, v, 1);
             if (trailer) {
                 page.appendItem('youtube:video:simple:' + escape(page.metadata.title + " - " + 'Трейлер') + ":" + trailer, "video", {
-                    title: 'Трейлер: ' + md.title,
+                    title: new showtime.RichText(md.title),
                     icon: "http://i.ytimg.com/vi/" + trailer + "/hqdefault.jpg",
                     rating: +md.rating * 10
                 });
@@ -240,8 +244,8 @@
                         if (service.thetvdb) {
                             item.bindVideoMetadata({
                                 title: md.eng_title.trim(),
-                                season: +md.season,
-                                episode: +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][2], 1)
+                                season: +data.season,
+                                episode: +data.episode
                             });
                         }
                     }
@@ -256,7 +260,7 @@
                 re = /sof.tv.initEvents[\S\s]+?(\{.+?\})/;
                 data.links = showtime.JSONDecode(match(/sof.tv.initEvents[\S\s]+?(\{.+?\})/, v, 1));
                 item = page.appendItem(PREFIX + ":play:" + escape(showtime.JSONEncode(data)), "video", {
-                    title: md.title + (md.eng_title ? ' | ' + md.eng_title : ' |'),
+                    title: new showtime.RichText(md.title + (md.eng_title ? ' | ' + md.eng_title : '')),
                     season: +md.season,
                     year: md.year,
                     imdbid: md.imdbid,
@@ -294,10 +298,56 @@
             e(ex);
         }
     });
+    plugin.addURI(PREFIX + ":select:(\/.+?\/)", function(page, url) {
+        page.metadata.title = PREFIX + ' | ' + 'Жанры и Категории';
+        try {
+            var v = showtime.httpReq(BASE_URL).toString();
+            var re = new RegExp('href="(' + url.match(/\/.+?\//) + '\\w+/)">(.+?)</a>', 'g');
+            var m = re.execAll(v);
+            page.appendItem(PREFIX + ":start", "directory", {
+                title: 'На начальную страницу',
+                description: 'На начальную страницу',
+                icon: logo
+            });
+            for (var i = 1; i < m.length; i++) {
+                page.appendItem(PREFIX + ":sort:" + (m[i][1]), "directory", {
+                    title: new showtime.RichText(m[i][2]),
+                    description: new showtime.RichText(m[i][2]),
+                    icon: logo
+                });
+            }
+        } catch (ex) {
+            page.error("Failed to process categories page (get_cat)");
+            e(ex);
+        }
+        page.type = "directory";
+        page.loading = false;
+        page.metadata.logo = logo;
+    });
+    plugin.addURI(PREFIX + ":sort:(\/.+?\/)", function(page, url) {
+        page.metadata.title = PREFIX + ' | ' + 'Сортировать по:';
+        page.appendItem(PREFIX + ":index:" + url + ':' + 'last', "directory", {
+            title: 'Последние поступления',
+            description: 'Последние поступления',
+            icon: logo
+        });
+        page.appendItem(PREFIX + ":index:" + url + ':' + 'popular', "directory", {
+            title: 'Популярные',
+            description: 'Популярные',
+            icon: logo
+        });
+        page.appendItem(PREFIX + ":index:" + url + ':' + 'watching', "directory", {
+            title: 'Сейчас смотрят',
+            description: 'Сейчас смотрят',
+            icon: logo
+        });
+        page.type = "directory";
+        page.loading = false;
+        page.metadata.logo = logo;
+    });
     // Play links
     plugin.addURI(PREFIX + ":play:(.*)", function(page, data) {
-        
-        var canonicalUrl = PREFIX + ":play:" + (data)
+        var canonicalUrl = PREFIX + ":play:" + (data);
         data = showtime.JSONDecode(unescape(data));
         var video = get_video_link(data);
         page.type = "video";
@@ -413,7 +463,7 @@
         i = typeof i !== 'undefined' ? i : 0;
         if (re.exec(st.toString())) {
             return re.exec(st)[i];
-        } else return false;
+        } else return '';
     }
 
     function trim(s) {
