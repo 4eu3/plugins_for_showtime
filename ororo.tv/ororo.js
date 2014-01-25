@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.1
+//ver 0.5.2
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -111,7 +111,7 @@
                 'Accept-Language': 'en-US,en;q=0.5',
                 'Accept-Encoding': 'gzip, deflate'
             }
-        });
+        }).toString();
         if (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)) {
             var authenticity_token = (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)[1]);
             var reason = "Login required";
@@ -177,7 +177,8 @@
             }
         }
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
-        var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?original="\/([^"]+)[\S\s]+?icon-star[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
+        var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?data-original="\/([^"]+)[\S\s]+?<span class='star'>[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?<div class='title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
+	p(v)
         var m = re.execAll(v);
         for (i = 0; i < m.length; i++) {
             var item = page.appendItem(PREFIX + ":page:" + m[i][2], "video", {
