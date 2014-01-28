@@ -1,7 +1,7 @@
 /*
  *  HDRezka  - Showtime Plugin
  *
- *  Copyright (C) 2013 Buksa
+ *  Copyright (C) 2014 Buksa
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.3
+//ver 0.3.4
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -185,6 +185,7 @@
             var md = {};
             var data = {};
             md.url = BASE_URL + link;
+            data.id = match(/\/([0-9]+(?:\.[0-9]*)?)-/, link, 1);
             md.title = showtime.entityDecode(match(/<h1 itemprop="name">(.+?)<\/h1>/, v, 1));
             data.title = md.title;
             md.eng_title = showtime.entityDecode(match(/<div class="b-post__origtitle" itemprop="alternativeHeadline">(.+?)<\/div>/, v, 1));
@@ -257,8 +258,8 @@
                 page.appendItem("", "separator", {
                     title: new showtime.RichText('Фильм:')
                 });
-                re = /sof.tv.initEvents[\S\s]+?(\{.+?\})/;
-                data.links = showtime.JSONDecode(match(/sof.tv.initEvents[\S\s]+?(\{.+?\})/, v, 1));
+                //re = /sof.tv.initEvents[\S\s]+?(\{.+?\})/;
+                //data.links = showtime.JSONDecode(match(/sof.tv.initEvents[\S\s]+?(\{.+?\})/, v, 1));
                 item = page.appendItem(PREFIX + ":play:" + escape(showtime.JSONEncode(data)), "video", {
                     title: new showtime.RichText(md.title + (md.eng_title ? ' | ' + md.eng_title : '')),
                     season: +md.season,
@@ -298,7 +299,8 @@
             e(ex);
         }
     });
-    plugin.addURI(PREFIX + ":select:(\/.+?\/)", function(page, url) {
+    plugin.addURI(PREFIX + ":select:(.*)", function(page, url) {
+        //\/.+?\/
         page.metadata.title = PREFIX + ' | ' + 'Жанры и Категории';
         try {
             var v = showtime.httpReq(BASE_URL).toString();
@@ -324,7 +326,7 @@
         page.loading = false;
         page.metadata.logo = logo;
     });
-    plugin.addURI(PREFIX + ":sort:(\/.+?\/)", function(page, url) {
+    plugin.addURI(PREFIX + ":sort:(.*)", function(page, url) {
         page.metadata.title = PREFIX + ' | ' + 'Сортировать по:';
         page.appendItem(PREFIX + ":index:" + url + ':' + 'last', "directory", {
             title: 'Последние поступления',
@@ -349,6 +351,7 @@
     plugin.addURI(PREFIX + ":play:(.*)", function(page, data) {
         var canonicalUrl = PREFIX + ":play:" + (data);
         data = showtime.JSONDecode(unescape(data));
+
         var video = get_video_link(data);
         page.type = "video";
         page.title = data.title;
@@ -405,15 +408,26 @@
     function get_video_link(data) {
         var v, result_url;
         try {
-            if (!data.links) {
-                var video = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
+            if (data.season) {
+                v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
                     postdata: {
                         id: data.id,
                         season: data.season ? data.season : '',
                         episode: data.episode ? data.episode : ''
                     }
                 }).toString());
-                data.links = showtime.JSONDecode(video.link);
+                data.links = showtime.JSONDecode(v.link);
+            } else {
+                v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
+                    postdata: {
+                        id: data.id
+                    }
+                }).toString());
+                p(v)
+                if (match(/src="(.+?)"/, v.link, 1)) {
+                    return match(/setFlash\('([^']+)/, showtime.httpReq(match(/src="(.+?)"/, v.link, 1)).toString(), 1).replace('/manifest.f4m', '/index.m3u8');
+                }
+                data.links = showtime.JSONDecode(v.link);
             }
             //            p(data);
             if (service.Format == 'mp4') {

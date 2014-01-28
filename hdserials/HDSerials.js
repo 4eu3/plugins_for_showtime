@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8.3 API
+//ver 0.8.4 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -227,7 +227,7 @@
         page.paginator = loader;
     });
     plugin.addURI(PREFIX + ":filter-videos:(.*):(.*)", function(page, id, title) {
-        var i, item, genres, actors, directors, countries;
+        var i, item, genres, actors, directors, countries, data = {};
         var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
             method: 'POST',
             headers: {
@@ -273,19 +273,22 @@
                 });
                 for (j in JSON.data.files) {
                     if (JSON.data.files[j].season == i + 1) {
-                        item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[j].url) + ':' + escape(JSON.data.files[j].title), "video", {
-                            title: showtime.entityDecode(unescape(JSON.data.files[j].title)),
-                            season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
+                        data = {
+                            title: JSON.data.info.title_en,
+                            year: JSON.data.info.year,
+                            season: JSON.data.files[j].season,
+                            episode: JSON.data.files[j].episode,
+                            url: JSON.data.files[j].url
+                        };
+                        item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(showtime.JSONEncode(data)), "video", {
+                            title: new showtime.RichText(JSON.data.files[j].title),
                             description: new showtime.RichText((JSON.data.info.translation ? coloredStr('Перевод: ', orange) + JSON.data.info.translation + '\n' : '') + (countries ? coloredStr('Страна: ', orange) + countries + '\n' : '') + (directors ? coloredStr('Режиссер: ', orange) + directors + ' ' : '') + (actors ? '\n' + coloredStr('В ролях актеры: ', orange) + actors + '\n' : '') + (JSON.data.info.description ? coloredStr('Описание: ', orange) + JSON.data.info.description : '')),
                             duration: JSON.data.info.duration ? JSON.data.info.duration : '',
                             rating: JSON.data.info.hd_rating * 10,
                             genre: genres ? genres : '',
-                            actor: actors ? actors : '',
-                            director: directors ? directors : '',
                             year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
-                            icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
+                            icon: JSON.data.info.image_file ? JSON.data.info.image_file : ''
                         });
-                        //code
                     }
                     //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
                 }
@@ -293,14 +296,19 @@
             }
         } else {
             for (i in JSON.data.files) {
-                item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(JSON.data.files[i].url) + ':' + escape(JSON.data.files[i].title), "video", {
-                    title: showtime.entityDecode(unescape(JSON.data.files[i].title)),
-                    season: showtime.entityDecode(unescape(JSON.data.info.season ? JSON.data.info.season : "")),
-                    description: JSON.data.info.translation ? "Перевод: " + JSON.data.info.translation + "\n" + JSON.data.info.description : JSON.data.info.description,
+                data = {
+                    title: JSON.data.info.title_en,
+                    year: JSON.data.info.year,
+                    season: JSON.data.files[i].season,
+                    episode: JSON.data.files[i].episode,
+                    url: JSON.data.files[i].url
+                };
+                item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(showtime.JSONEncode(data)), "video", {
+                    title: new showtime.RichText(JSON.data.files[i].title),
+                    description: new showtime.RichText((JSON.data.info.translation ? coloredStr('Перевод: ', orange) + JSON.data.info.translation + '\n' : '') + (countries ? coloredStr('Страна: ', orange) + countries + '\n' : '') + (directors ? coloredStr('Режиссер: ', orange) + directors + ' ' : '') + (actors ? '\n' + coloredStr('В ролях актеры: ', orange) + actors + '\n' : '') + (JSON.data.info.description ? coloredStr('Описание: ', orange) + JSON.data.info.description : '')),
                     duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                    rating: JSON.data.info.hd_rating * 10,
                     genre: genres ? genres : '',
-                    actor: actors ? actors : '',
-                    director: directors ? directors : '',
                     year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
                     icon: JSON.data.info.image_file ? unescape(JSON.data.info.image_file) : ''
                 });
@@ -310,16 +318,21 @@
         setPageHeader(page, unescape(title));
     });
     // Play links
-    plugin.addURI(PREFIX + ":video:(.*):(.*)", function(page, url, title) {
+    plugin.addURI(PREFIX + ":video:(.*)", function(page, data) {
         //no loading circle was present, forcing
+        var canonicalUrl = PREFIX + ":play:" + (data);
+        data = showtime.JSONDecode(unescape(data));
+        //  p(data.subs)
         page.loading = true;
-        var video = get_video_link(unescape(url));
+        var video = get_video_link(data.url);
         if (showtime.probe(video).result === 0) {
             page.type = "video";
             page.source = "videoparams:" + showtime.JSONEncode({
-                title: unescape(title),
+                title: data.title,
+                //season: data.season ? data.season : -1,
+                //episode: data.episode ? data.episode : -1,
                 no_fs_scan: true,
-                canonicalUrl: PREFIX + ":video:" + url + ":" + title,
+                canonicalUrl: canonicalUrl,
                 sources: [{
                     url: video
                 }]
@@ -369,11 +382,12 @@
                 result_url = "http://" + video_host + "/assets/videos/" + video_vtag + vkid + "." + fname;
             }
         } else {
-            v = url.match("video\/(.*?)\/iframe")[1];
+            v = showtime.httpReq(url).toString();
             var JSON = showtime.JSONDecode(showtime.httpReq('http://moonwalk.cc/sessions/create_session', {
                 debug: true,
                 postdata: {
-                    video_token: v
+                    video_token: /video_token: '(.+?)'/.exec(v)[1],
+                    video_secret: /video_secret: '(.+?)'/.exec(v)[1]
                 }
             }));
             result_url = 'hls:' + JSON.manifest_m3u8;
