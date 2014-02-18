@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+//ver 0.5.4
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -44,10 +44,6 @@
     var main_menu_order = plugin.createStore('main_menu_order', true);
     var items = [];
     var items_tmp = [];
-/*if (!main_menu_order.ready) {
-    //    main_menu_order.ready = "1";
-    //}
-    */
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
     settings.createBool("tosaccepted", "Accepted TOS (available in opening the plugin)", false, function(v) {
@@ -56,7 +52,6 @@
     settings.createBool("arrayview", "Show array view", false, function(v) {
         service.arrayview = v;
     });
-    
     settings.createBool("thetvdb", "Show more information using thetvdb", false, function(v) {
         service.thetvdb = v;
     });
@@ -66,7 +61,6 @@
     settings.createBool("debug", "Debug logging", false, function(v) {
         service.debug = v;
     });
-
     var Format = [
         ['.mp4', 'MP4', true],
         ['.webm', 'Webm/VP8']
@@ -98,8 +92,7 @@
             page.error("TOS not accepted. plugin disabled");
             return;
         }
-	if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
-	
+        if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
         page.metadata.logo = logo;
         page.metadata.title = PREFIX;
         pageMenu(page);
@@ -180,20 +173,24 @@
                 do_query = true;
             }
         }
+        //    v = v.toString()
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
-        var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?data-original="\/([^"]+)[\S\s]+?<span class='star'>[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?<div class='title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
-	p(v)
-        var m = re.execAll(v);
-        for (i = 0; i < m.length; i++) {
-            var item = page.appendItem(PREFIX + ":page:" + m[i][2], "video", {
-                title: new showtime.RichText(trim(m[i][5]) /*+ ' | ' + trim(m[i][6])*/ ),
-                description: new showtime.RichText(m[i][6]),
-                icon: BASE_URL + m[i][3],
-                rating: m[i][4] * 10
+        var show = v.split("<div class='index show");
+        for (i = 1; i < show.length; i++) {
+            var title = trim(match(/<div class='title'>([^<]+)/, show[i], 1));
+            var url = match(/href="\/([^"]+)/, show[i], 1);
+            var icon = BASE_URL + match(/data-original="\/([^"]+)/, show[i], 1);
+            var newest = match(/data-newest='([^']+)/, show[i], 1);
+            var rating = +match(/class='star'>[\S\s]+?value'>([0-9]+(?:\.[0-9]*)?)</, show[i], 1);
+            var item = page.appendItem(PREFIX + ":page:" + url, "video", {
+                title: new showtime.RichText(title /*+ ' | ' + trim(m[i][6])*/ ),
+                description: new showtime.RichText(match(/class='title'>[\s\S]+?<\/div>([\s\S]+?)<\/div>/, show[i], 1)),
+                icon: icon,
+                rating: rating * 10
             });
-            item.title = trim(m[i][5]);
-            item.newest = m[i][1];
-            item.rating = +m[i][4];
+            item.title = title;
+            item.newest = newest;
+            item.rating = rating;
             items.push(item);
             items_tmp.push(item);
         }
@@ -201,27 +198,13 @@
             for (i in items) {
                 items[i].id = i;
             }
-            //if (!main_menu_order.order) {
             items_tmp = page.getItems();
-            //var its = [];
-            //for (i in items) {
-            //    items[i].orig_index = i;
-            //    its.push(items[i]);
-            //}
-            //its.sort(function(a, b) {
-            //    return a.title > b.title;
-            //});
             for (i = 0; i < items_tmp.length; i++) {
                 if (!items_tmp[i].id) delete items_tmp[i];
             }
             items_tmp.sort(function(a, b) {
                 return b.newest > a.newest;
             });
-/*/       main_menu_order.order = showtime.JSONEncode(items_tmp);
-            //    }
-            //    main_menu_order.order;
-            //var order = showtime.JSONDecode(main_menu_order.order);
- */
             var order = (items_tmp);
             for (i in order) {
                 items[order[i].id].moveBefore(i);
@@ -232,7 +215,6 @@
                 for (var i = 0; i < items.length; i++) {
                     if (!items[i].id) delete items[i];
                 }
-                main_menu_order.order = showtime.JSONEncode(items);
             };
         } catch (ex) {
             t("Error while parsing main menu order");
@@ -240,19 +222,12 @@
         }
         page.type = "directory";
         page.contents = "items";
-        //} catch (ex) {
-        //    page.error("Failed to process page");
-        //    e(ex);
-        //}
         page.loading = false;
     });
     plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
         page.type = "directory";
         var i, v, item;
-        if (service.arrayview) {
-            page.metadata.background = plugin.path + "views/img/background.png";
-            page.metadata.backgroundAlpha = 0.5;
-        };
+
         try {
             v = showtime.httpReq(BASE_URL + link, {
                 debug: service.debug,
@@ -266,14 +241,16 @@
                 }
             });
             var title = showtime.entityDecode(trim(match(/<img alt="(.+?)" id="poster"/, v, 1)));
+                    if (service.arrayview) {
+            page.metadata.background =  bg(title);
+            page.metadata.backgroundAlpha = 0.5;
+        }
             var year = parseInt(match(/<div id='year'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
             var duration = parseInt(match(/<div id='length'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var genre = trim(match(/<div id='genres'>[\s\S]+?:<\/span>([\s\S]+?)</, v, 1));
-            ////get_fanart(page,metadata.title)
             var icon = match(/id="poster" src="\/(.+?)"/, v, 1);
             page.metadata.logo = BASE_URL + icon;
-            //metadata.description = trim(match(/<div itemprop="description">[\S\s]+?(.+?)<div/,v));
             page.metadata.title = title + " (" + year + ")";
             //<a href="#1-3" class="episode" data-href="/shows/planet-earth/videos/2946" data-id="2946" data-time="null">№3 Fresh Water</a>
             var re = /<a href="#?([^-]+)-([^"]+)" [\S\s]+?data-href="\/([^"]+)[\S\s]+?>([^<]+)([\S\s]+?)<\/li/g;
@@ -308,10 +285,12 @@
             page.error("Failed to process page");
             e(ex);
         }
+        page.type = "directory";
+        page.loading = false;
     });
     // Play links
     plugin.addURI(PREFIX + ":play:(.*):(.*)", function(page, url, title) {
-	page.loading = true;
+        page.loading = true;
         page.metadata.logo = logo;
         var s = unescape(title).split('|');
         var video = get_video_link(url);
@@ -338,7 +317,6 @@
     function get_video_link(url) {
         var video = [];
         try {
-            p(BASE_URL + url);
             var v = showtime.httpReq(BASE_URL + url, {
                 debug: service.debug,
                 headers: {
@@ -347,9 +325,6 @@
                     //   'Location':'http://static-ua.ororo.tv/uploads/video/file/15896/Almost.Human.S01E03.HDTV.x264-LOL.mp4'
                 }
             });
-            p(v);
-            //video.url = match(/video.tag.src = webm \? "\/(.+?)"/, v, 1) ? BASE_URL + match(/video.tag.src = webm \? "\/(.+?)"/, v, 1) : match(/video.tag.src = webm \? "(.+?)"/, v, 1);
-            //video.sub = BASE_URL + match(/src: "\/(.+?)"/, v, 1);
             video.url = match(/<source src='\/(.*?)' type='video/, v, 1) ? BASE_URL + match(/<source src='\/(.*?)' type='video/, v, 1) : match(/<source src='(.*?)' type='video/, v, 1);
             video.sub = BASE_URL + match(/subtitles on' src='\/(.*)' srclang/, v, 1);
         } catch (err) {
@@ -359,13 +334,10 @@
     }
 
     function pageMenu(page) {
-        //page.metadata.background = ui.background;
         if (service.arrayview) {
             page.metadata.background = plugin.path + "views/img/background.png";
             page.metadata.backgroundAlpha = 0.5;
-        };
-        //page.metadata.font = "default";
-        // page.appendAction("navopen", "search:", true, { title: "Search", icon: plugin.path + "views/img/search.png" });
+        }
         page.appendAction("pageevent", "sortDateDec", true, {
             title: "Sort by Date (Decrementing)",
             icon: plugin.path + "views/img/sort_date_dec.png"
@@ -382,7 +354,6 @@
             title: "Sort Alphabetically (Decrementing)",
             icon: plugin.path + "views/img/sort_alpha_dec.png"
         });
-        //  page.appendAction("pageevent", "sortDefault", true, { title: "Sort as Default", icon: plugin.path + "views/img/sort_default.png" });
         var sorts = [
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
             ["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
@@ -473,6 +444,21 @@
         }
         return matches;
     };
+
+    function bg(title) {
+        title = trim(title);
+        var v = showtime.httpGet('http://www.thetvdb.com/api/GetSeries.php', {
+            'seriesname': title,
+            'language': 'ru'
+        }).toString();
+        var id = match(/<seriesid>(.+?)<\/seriesid>/, v, 1);
+        if (id) {
+            v = (showtime.httpReq('http://www.thetvdb.com/api/0ADF8BA762FED295/series/' + id + '/banners.xml').toString());
+            id = match(/<BannerPath>fanart\/original\/([^<]+)/, v, 1);
+            return "http://thetvdb.com/banners/fanart/original/" + id;
+        }
+        return plugin.path + "views/img/background.png";
+    }
 
     function getCookie(name, multiheaders) {
         var cookie = showtime.JSONEncode(multiheaders['Set-Cookie']);
