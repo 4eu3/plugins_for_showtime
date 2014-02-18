@@ -1,8 +1,8 @@
 {
 	"id": "ororo",
-	"version": "0.5.3",
+	"version": "0.5.4",
 	"type": "javascript",
-	"author": "Buksa",
+	"author": "Buksa, lprot",
 	"showtimeVersion": "4.3.567",
 	"title": "ororo.tv",
 	"synopsis": "Showtime plugin to watch tv shows from ororo.tv",

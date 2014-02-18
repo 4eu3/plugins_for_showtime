@@ -1,7 +1,7 @@
 /*
  *  ororo.tv  - Showtime Plugin
  *
- *  Copyright (C) 2013 Buksa
+ *  Copyright (C) 2014 Buksa, lprot
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.3
+
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -44,6 +44,10 @@
     var main_menu_order = plugin.createStore('main_menu_order', true);
     var items = [];
     var items_tmp = [];
+/*if (!main_menu_order.ready) {
+    //    main_menu_order.ready = "1";
+    //}
+    */
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
     settings.createBool("tosaccepted", "Accepted TOS (available in opening the plugin)", false, function(v) {
@@ -52,12 +56,17 @@
     settings.createBool("arrayview", "Show array view", false, function(v) {
         service.arrayview = v;
     });
+    
     settings.createBool("thetvdb", "Show more information using thetvdb", false, function(v) {
         service.thetvdb = v;
     });
     settings.createBool("subs", "Show Subtitle from Ororo.tv ", true, function(v) {
         service.subs = v;
     });
+    settings.createBool("debug", "Debug logging", false, function(v) {
+        service.debug = v;
+    });
+
     var Format = [
         ['.mp4', 'MP4', true],
         ['.webm', 'Webm/VP8']
@@ -89,14 +98,15 @@
             page.error("TOS not accepted. plugin disabled");
             return;
         }
-        if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
+	if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
+	
         page.metadata.logo = logo;
         page.metadata.title = PREFIX;
         pageMenu(page);
         items = [];
         items_tmp = [];
         v = showtime.httpReq(BASE_URL + 'users/sign_in', {
-            debug: true,
+            debug: service.debug,
             //noFollow: true,
             headers: {
                 'Host': 'ororo.tv',
@@ -129,7 +139,7 @@
                         }
                     }
                     v = showtime.httpReq('http://ororo.tv/users/sign_in', {
-                        debug: true,
+                        debug: service.debug,
                         noFollow: true,
                         postdata: {
                             utf8: '✓',
@@ -151,7 +161,7 @@
                     }
                     if (remember_user_token) {
                         v = showtime.httpReq(BASE_URL, {
-                            debug: true,
+                            debug: service.debug,
                             //noFollow: true,
                             headers: {
                                 'Host': 'ororo.tv',
@@ -172,6 +182,7 @@
         }
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
         var re = /<div class='index show'[\S\s]+?data-newest='([^']+)[\S\s]+?href="\/([^"]+)[\S\s]+?data-original="\/([^"]+)[\S\s]+?<span class='star'>[\S\s]+?([0-9]+(?:\.[0-9]*)?)[\S\s]+?<div class='title'>([^<]+)[\S\s]+?<p>([^<]+)/g;
+	p(v)
         var m = re.execAll(v);
         for (i = 0; i < m.length; i++) {
             var item = page.appendItem(PREFIX + ":page:" + m[i][2], "video", {
@@ -190,13 +201,27 @@
             for (i in items) {
                 items[i].id = i;
             }
+            //if (!main_menu_order.order) {
             items_tmp = page.getItems();
+            //var its = [];
+            //for (i in items) {
+            //    items[i].orig_index = i;
+            //    its.push(items[i]);
+            //}
+            //its.sort(function(a, b) {
+            //    return a.title > b.title;
+            //});
             for (i = 0; i < items_tmp.length; i++) {
                 if (!items_tmp[i].id) delete items_tmp[i];
             }
             items_tmp.sort(function(a, b) {
                 return b.newest > a.newest;
             });
+/*/       main_menu_order.order = showtime.JSONEncode(items_tmp);
+            //    }
+            //    main_menu_order.order;
+            //var order = showtime.JSONDecode(main_menu_order.order);
+ */
             var order = (items_tmp);
             for (i in order) {
                 items[order[i].id].moveBefore(i);
@@ -207,6 +232,7 @@
                 for (var i = 0; i < items.length; i++) {
                     if (!items[i].id) delete items[i];
                 }
+                main_menu_order.order = showtime.JSONEncode(items);
             };
         } catch (ex) {
             t("Error while parsing main menu order");
@@ -214,14 +240,22 @@
         }
         page.type = "directory";
         page.contents = "items";
+        //} catch (ex) {
+        //    page.error("Failed to process page");
+        //    e(ex);
+        //}
         page.loading = false;
     });
     plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
+        page.type = "directory";
         var i, v, item;
-        page.metadata.backgroundAlpha = 0.5;
+        if (service.arrayview) {
+            page.metadata.background = plugin.path + "views/img/background.png";
+            page.metadata.backgroundAlpha = 0.5;
+        };
         try {
             v = showtime.httpReq(BASE_URL + link, {
-                debug: true,
+                debug: service.debug,
                 headers: {
                     'Host': 'ororo.tv',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
@@ -232,8 +266,6 @@
                 }
             });
             var title = showtime.entityDecode(trim(match(/<img alt="(.+?)" id="poster"/, v, 1)));
-	    page.metadata.background = get_fanart(title)
-	    p(page.metadata.background)
             var year = parseInt(match(/<div id='year'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
             var duration = parseInt(match(/<div id='length'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
@@ -246,6 +278,7 @@
             //<a href="#1-3" class="episode" data-href="/shows/planet-earth/videos/2946" data-id="2946" data-time="null">№3 Fresh Water</a>
             var re = /<a href="#?([^-]+)-([^"]+)" [\S\s]+?data-href="\/([^"]+)[\S\s]+?>([^<]+)([\S\s]+?)<\/li/g;
             var m = re.execAll(v);
+            page.loading = false;
             if (m.toString()) {
                 for (i = 0; i < m.length; i++) {
                     if (m[i][2] == '1') {
@@ -275,12 +308,10 @@
             page.error("Failed to process page");
             e(ex);
         }
-        page.type = "directory";
-        page.loading = false;
     });
     // Play links
     plugin.addURI(PREFIX + ":play:(.*):(.*)", function(page, url, title) {
-        page.loading = true;
+	page.loading = true;
         page.metadata.logo = logo;
         var s = unescape(title).split('|');
         var video = get_video_link(url);
@@ -309,7 +340,7 @@
         try {
             p(BASE_URL + url);
             var v = showtime.httpReq(BASE_URL + url, {
-                debug: true,
+                debug: service.debug,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0' //,
                     //    'Cookie': this.id+"; "+ this._ororo_session+'; '+remember_user_token+'; video=true;',
@@ -329,8 +360,10 @@
 
     function pageMenu(page) {
         //page.metadata.background = ui.background;
-        page.metadata.background = plugin.path + "views/img/background.png";
-        page.metadata.backgroundAlpha = 0.5;
+        if (service.arrayview) {
+            page.metadata.background = plugin.path + "views/img/background.png";
+            page.metadata.backgroundAlpha = 0.5;
+        };
         //page.metadata.font = "default";
         // page.appendAction("navopen", "search:", true, { title: "Search", icon: plugin.path + "views/img/search.png" });
         page.appendAction("pageevent", "sortDateDec", true, {
@@ -441,21 +474,6 @@
         return matches;
     };
 
-    function get_fanart(title) {
-        title = trim(title);
-        var v = showtime.httpGet('http://www.thetvdb.com/api/GetSeries.php', {
-            'seriesname': title,
-            'language': 'ru'
-        }).toString();
-        var id = match(/<seriesid>(.+?)<\/seriesid>/, v, 1);
-        if (id) {
-            v = (showtime.httpReq('http://www.thetvdb.com/api/0ADF8BA762FED295/series/' + id + '/banners.xml').toString());
-            id = match(/<BannerPath>fanart\/original\/([^<]+)/, v, 1);
-            return "http://thetvdb.com/banners/fanart/original/" + id;
-        }
-        return plugin.path + "views/img/background.png";
-    }
-
     function getCookie(name, multiheaders) {
         var cookie = showtime.JSONEncode(multiheaders['Set-Cookie']);
         p('cookie: ' + cookie);
@@ -484,16 +502,16 @@
     }
 
     function t(message) {
-        showtime.trace(message, plugin.getDescriptor().id);
+        if (service.debug) showtime.trace(message, plugin.getDescriptor().id);
     }
 
     function p(message) {
         if (typeof(message) === 'object') message = showtime.JSONEncode(message);
-        showtime.print(message);
+        if (service.debug) showtime.print(message);
     }
 
     function trace(msg) {
-        if (service.debug == '1') {
+        if (service.debug) {
             t(msg);
             p(msg);
         }
