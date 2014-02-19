@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.4
+//ver 0.5.5
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -165,7 +165,7 @@
                                 'Referer': 'http://ororo.tv/users/sign_in' //,
                                 // 'Cookie': this.id+'; '+this._ororo_session+'; '+this.remember_user_token
                             }
-                        });
+                        })
                         break;
                     }
                 }
@@ -173,7 +173,7 @@
                 do_query = true;
             }
         }
-        //    v = v.toString()
+        v = v.toString()
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
         var show = v.split("<div class='index show");
         for (i = 1; i < show.length; i++) {
@@ -227,7 +227,6 @@
     plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
         page.type = "directory";
         var i, v, item;
-
         try {
             v = showtime.httpReq(BASE_URL + link, {
                 debug: service.debug,
@@ -241,10 +240,10 @@
                 }
             });
             var title = showtime.entityDecode(trim(match(/<img alt="(.+?)" id="poster"/, v, 1)));
-                    if (service.arrayview) {
-            page.metadata.background =  bg(title);
-            page.metadata.backgroundAlpha = 0.5;
-        }
+            if (service.arrayview) {
+                page.metadata.background = bg(title);
+                page.metadata.backgroundAlpha = 0.5;
+            }
             var year = parseInt(match(/<div id='year'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
             var duration = parseInt(match(/<div id='length'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
@@ -471,7 +470,7 @@
         i = typeof i !== 'undefined' ? i : 0;
         if (re.exec(st)) {
             return re.exec(st)[i];
-        } else return false;
+        } else return '';
     }
 
     function trim(s) {
