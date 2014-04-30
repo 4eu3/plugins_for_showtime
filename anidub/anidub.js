@@ -145,6 +145,11 @@
         // }
         // loader();
         // page.paginator = loader;
+        
+                    pageController(page, function(offset) {
+
+                return showtime.httpGet(BASE_URL+'/page/'+offset).toString();
+            });
         page.loading = false;
     });
     plugin.addURI(PREFIX + "page:(.*)", function(page, link) {
@@ -327,6 +332,46 @@
         }
     });
 
+        function pageController(page, loader) {
+        var offset = 1;
+
+        function paginator() {
+            var num = 0;
+
+            while(true) {
+                var res = loader(offset);
+                var c = 0;
+                page.entries = 1 + num;
+
+                var nextpage = match(/<span class="nnext"><a href="http:\/\/online.anidub.com([^"]+)">/, res, 1)
+                
+var re = /<div class="poster_img"><a href="http:\/\/online.anidub.com([^"]+)"[\S\s]+?alt="([^"]+)"[\S\s]+?="([^"]+)" src/g;
+        var m = re.execAll(res);
+        for (var i = 0; i < m.length; i++) {
+            //  p(m[i][1]+'\n'+m[i][2]+'\n'+m[i][3]+'\n')
+            page.appendItem(PREFIX + "page:" + m[i][1], "video", {
+                title: new showtime.RichText(m[i][2]),
+                description: new showtime.RichText(m[i][2]),
+                icon: m[i][3]
+            });
+            c++;
+        }
+
+                page.loading = false;
+                num += c;
+                offset++;
+                if(c == 0 || !nextpage || offset > 10)
+                    break;
+            }
+            offset += num;
+            return offset < page.entries;
+        }
+
+        page.type = "directory";
+        paginator();
+        page.paginator = paginator;
+    }
+    
     function get_video_link(url) {
         var result_url = 'http://vk.com/' + url;
         try {
