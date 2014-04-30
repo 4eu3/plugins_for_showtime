@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.3.4
+//ver 0.3.6
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -67,7 +67,10 @@
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
         if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
-        else page.error("TOS not accepted. plugin disabled");
+        else {
+            page.error("TOS not accepted. plugin disabled");
+            return;
+        };
         var v, re, m, i;
         //page.loading = true;
         re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div>(.+?)<\/div>/g;
@@ -192,7 +195,7 @@
             data.eng_title = md.eng_title;
             md.icon = match(/<img itemprop="image" src="(.+?)"/, v, 1);
             md.rating = +match(/<span class="b-post__info_rates imdb">IMDb:[\S\s]+?([0-9]+(?:\.[0-9]*)?)<\/span>/, v, 1);
-            md.year = +match(/http:\/\/hdrezka.tv\/year\/([^/]+)/, v, 1);
+            md.year = +match(/http:\/\/hdrezka.tv\/year\/(\d{4})/, v, 1);
             data.year = md.year;
             md.slogan = match(/>Слоган:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.rel_date = match(/>Дата выхода:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
@@ -219,11 +222,13 @@
                 title: 'найти трейлер на YouTube'
             });
             //serials
-            var eplist = match(/<ul id="episodes-list-(.+?)" class="b-episodes([\S\s]+?)ul>/, v, 1);
+            //var eplist = match(/<ul id="episodes-list-(.+?)" class="b-episodes([\S\s]+?)ul>/, v, 1);
+            var eplist = match(/<ul id="episodes-list-(.+?)" class="b-episodes__list clearfix">([\S\s]+?)ul>/, v, 1);
             if (eplist) {
                 // if (link.indexOf('/series/') != -1) {
-                re = /<ul id="episodes-list-(.+?)" class="b-episodes([\S\s]+?)ul>/g;
-                m = re.execAll(v.match(/<div class="b-episodes__wrapper">[\S\s]+?<div class="b-content__columns pdb clearfix">/));
+                re = /<ul id="episodes-list-(.+?)" class="b-episodes__list([\S\s]+?)ul>/g;
+                p()
+                m = re.execAll(v.match(/<div class="b-episodes__wrapper">[\S\s]+?<div class="b-content__columns/));
                 for (i = 0; i < m.length; i++) {
                     page.appendItem("", "separator", {
                         title: new showtime.RichText('Сезон ' + m[i][1])
@@ -278,12 +283,12 @@
                     });
                 }
             }
-            var sidetitle = match(/<div class="b-sidetitle"><h3>(.+?)<\/h3><\/div>/, v, 1);
+            var sidetitle = match(/<div class="b-sidetitle">.*>(.+?)</, v, 1);
             if (sidetitle) {
                 page.appendItem("", "separator", {
-                    title: new showtime.RichText(sidetitle.replace('бесплатные', '').replace('Смотреть п', 'П'))
+                    title: new showtime.RichText(sidetitle.replace(' бесплатные', '').replace('Смотреть п', 'П'))
                 });
-                re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div>(.+?)<\/div>/g;
+                re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div.*>(.+?)<\/div>/g
                 m = re.execAll(v);
                 for (i = 0; i < m.length; i++) {
                     page.appendItem(PREFIX + ":page:" + m[i][1], "video", {
