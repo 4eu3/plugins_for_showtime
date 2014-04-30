@@ -1,0 +1,14 @@
+{
+	"id": "DreamFilm",
+	"version": "0.2",
+	"type": "javascript",
+	"author": "Buksa",
+	"showtimeVersion": "4.5.283",
+	"title": "DreamFilm",
+	"synopsis": "Dreamfilm - Se SWESUB Filmer Gratis Online - Film Online - TV-Serier",
+	"description":"<p>DreamFilm - Showtime plugin is the integration of the website <a href=\"http://dreamfilm.se\">DremFilm.se</a> into Showtime",
+	"homepage":"https://github.com/Buksa/plugins_for_showtime/DreamFilm",
+	"category": "video",
+	"icon": "logo.png",
+	"file": "DreamFilm.js"
+}
