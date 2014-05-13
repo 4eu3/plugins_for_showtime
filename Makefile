@@ -3,7 +3,7 @@ PLUGINS= \
         aMovies.zip \
         anidub.zip \
         asiandrama.ru.zip \
-        HDSerials.zip \
+        hdserials.zip \
         hiphophit.zip \
         kaban.tv.zip \
 	kino-dom.tv.zip \
@@ -11,7 +11,8 @@ PLUGINS= \
         ororo.tv \
 	video.az.zip \
 	couchtuner.eu.zip \
-        vkvideos.zip
+        vkvideos.zip \
+	DreamFilm.zip \
 
 %.zip:
 	@echo "Bundle plugin '$*'"

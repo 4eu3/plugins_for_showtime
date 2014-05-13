@@ -16,13 +16,13 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8.4 API
+//ver 0.8.5 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
     var BASE_URL = 'http://hdserials.galanov.net';
     var logo = plugin.path + "img/logo.png";
-    var USER_AGENT = 'Android;HD Serials v.1.7.0;ru-RU;google Nexus 4;SDK 10;v.2.3.3(REL)';
+    var USER_AGENT = 'Android;HD Serials v.1.8.4;ru-RU;google Nexus 4;SDK 10;v.2.3.3(REL)';
     plugin.addHTTPAuth("http:\/\/.*.galanov.net.*", function(authreq) {
         authreq.setHeader("User-Agent", USER_AGENT);
     });
@@ -320,7 +320,7 @@
     // Play links
     plugin.addURI(PREFIX + ":video:(.*)", function(page, data) {
         //no loading circle was present, forcing
-        var canonicalUrl = PREFIX + ":play:" + (data);
+        var canonicalUrl = PREFIX + ":video:" + data;
         data = showtime.JSONDecode(unescape(data));
         //  p(data.subs)
         page.loading = true;

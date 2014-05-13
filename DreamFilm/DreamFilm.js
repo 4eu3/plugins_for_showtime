@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.2
+//ver 0.3
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -90,7 +90,7 @@
         m = re.execAll(v);
         for (i = 0; i < 7; i++) {
             page.appendItem(PREFIX + ":page:" + m[i][4], "video", {
-                title: new showtime.RichText(trim(showtime.entityDecode(m[i][1]))),
+                title: new showtime.RichText(trim(m[i][1])),
                 genre: new showtime.RichText(trim(m[i][2])),
                 description: new showtime.RichText(trim(m[i][3])),
                 icon: m[i][5].indexOf('http') !== -1 ? m[i][5] : (BASE_URL + "/" + m[i][5]),
@@ -374,6 +374,7 @@
 
     function trim(s) {
         s = s.toString();
+        s = s.replace(/\t/g, " ");
         s = s.replace(/(\r\n|\n|\r)/gm, "");
         s = s.replace(/(^\s*)|(\s*$)/gi, "");
         s = s.replace(/[ ]{2,}/gi, " ");
