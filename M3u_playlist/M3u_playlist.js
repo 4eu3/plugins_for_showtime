@@ -14,7 +14,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.1
+//ver 0.2
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -25,13 +25,23 @@
     var settings = plugin.createSettings(plugin_info.title, logo, plugin_info.synopsis);
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
-    settings.createString("M3u Playlist", "playlist Source", "http://iptv.10ptz.ru/iptv_2.m3u", function(v) {
+    
+    settings.createBool("debug", "Debug", false, function(v) {
+        service.debug = v;
+    });
+    
+    settings.createString("M3u Playlist", "playlist Source", "", function(v) {
         service.pl = v;
     });
+
     //First level start page
     plugin.addURI(PREFIX + ":start", function(page) {
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
+        if (service.pl == '') {
+             var pl = showtime.textDialog('play list location: ', true, false);
+             service.pl = pl.input
+        } 
         var v = showtime.httpReq(service.pl).toString();
         var re = /#EXTINF:.*,\s*(.*)\s*(http:\/\/.+\s*)/g;
         var m = re.execAll(v.toString());
