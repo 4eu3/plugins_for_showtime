@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.3.6
+//ver 0.4
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -188,22 +188,27 @@
         page.paginator = loader;
     });
     plugin.addURI(PREFIX + ":page:(.*):(.*)", function(page, link, icon) {
-        var i, v, item, re, re2, m, m2;
+        var i, v, item, re, re2, m, m2 , data ={};
+        
         p(BASE_URL + link);
         v = showtime.httpReq(BASE_URL + link).toString();
         try {
 
             var md = {};
             md.title = showtime.entityDecode(match(/<title>Смотреть (.+?)онлайн /, v, 1));
+            data.title = md.title
             var ar_add_series = v.match(/class="title_d_dot">.*Архив добавления серий[\S\s]+?<\/div/);
             if (ar_add_series) {
                 re = /: (.*?) \| ([0-9]+(?:\.[0-9]*)?) сезон/;
                 md.season = parseInt(match(re, ar_add_series, 2), 10);
+                data.season = md.season
                 md.eng_title = showtime.entityDecode(match(re, ar_add_series, 1));
+                data.eng_title = match(/\| (.+)/, md.eng_title, 1)
             }
             md.icon = unescape(icon);
             // //                md.icon = match(/<div class="prev_img"><img src="(.+?)" alt=/, v, 1);               
             md.year = +match(/Год[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1);
+            data.year = md.year
             md.status = match(/<li><strong>Статус:<\/strong><span>(.+?)</, v, 1);
             md.genre = match(/<li><strong>Жанр:<\/strong><span>(.+?)</, v, 1);
             md.duration = +match(/<li><strong>Время[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1);
@@ -217,6 +222,8 @@
             //page.appendItem("", "separator", {
             //    title: new showtime.RichText('Трейлер:')
             //});
+                        p(md)
+            p(data)
             page.appendItem("youtube:feed:" + escape("https://gdata.youtube.com/feeds/api/videos?q=" + encodeURIComponent('Русский Трейлер ' + md.title)), "directory", {
                 title: 'найти трейлер на YouTube'
             });
@@ -259,7 +266,9 @@
                 m = re.execAll(v);
                 if (m.toString()) {
                     for (i = 0; i < m.length; i++) {
-                        item = page.appendItem(PREFIX + ":play:" + m[i][1] + ':' + escape(md.eng_title + ' | ' + md.year + ' | ' + md.season + ' сезон | ' + m[i][2]), "video", {
+                        data.url = m[i][1]
+                        data.episode = +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][2], 1)
+                        item = page.appendItem(PREFIX + ":play:" + escape(showtime.JSONEncode(data)), "video", {
                             title: md.eng_title + ' | ' + md.season + ' сезон | ' + m[i][2],
                             season: +md.season,
                             imdbid: md.imdbid,
@@ -272,9 +281,9 @@
                         });
                         if (service.thetvdb) {
                             item.bindVideoMetadata({
-                                title: md.title.split(' 1 сезон')[0].trim(),
+                                title: md.title.split('езон')[0].trim(),
                                 season: +md.season,
-                                episode: +match(/([0-9]+(?:\.[0-9]*)?)/, m[i][2], 1)
+                                episode: data.episode
                             });
                         }
                     }
@@ -292,9 +301,11 @@
                 //});
             }
             if (link.indexOf('/film/') != -1) {
+                data.eng_title = match(/title_d_dot.*\| ([^<]+)/,v,1)
                 p('film' + '\n' + link);
-                var video = match(/<iframe src="http:\/\/vk.com\/([^"]+)/, v, 1);
-                item = page.appendItem(PREFIX + ":play:" + video + ':' + escape(md.title.split(' | ')[1] + ' | ' + md.year), "video", {
+                p(md.title)
+                data.url = match(/<iframe src="http:\/\/vk.com\/([^"]+)/, v, 1);
+                item = page.appendItem(PREFIX + ":play:" + escape(showtime.JSONEncode(data)), "video", {
                     title: md.title,
                     season: +md.season,
                     year: md.year,
@@ -315,25 +326,28 @@
             //http://amovies.tv/eng
             if (link.indexOf('/eng/') != -1) {
                 p('eng' + '\n' + link);
-                re = /value=(?:"http:\/\/vk.com\/|"http:\/\/rutube.ru\/)([^"]+)[\S\s]+?>([^<]+)/g;
+                re = /value=(?:"http:\/\/vk.com\/|"http:\/\/rutube.ru\/)([^"]+)">(\W+)([0-9]+(?:\.[0-9]*)?) сезон ([0-9]+(?:\.[0-9]*)?) серия/g;
                 m = re.execAll(v);
                 if (m.toString()) {
                     for (i = 0; i < m.length; i++) {
-                        m2 = /(.+?)([0-9]+(?:\.[0-9]*)?) сезон ([0-9]+(?:\.[0-9]*)?) серия/.exec(m[i][2]);
-                        p(m[i][2] + m2);
-                        item = page.appendItem(PREFIX + ":play:" + m[i][1] + ':' + escape(m2[1].trim() + ' | S' + (+m2[2]) + ' |  Ep' + (+m2[3])), "video", {
-                            title: m2[1].trim() + ' | S' + (+m2[2]) + ' Ep' + m2[3]
+                        data.title = m[i][2].trim();
+                        data.season = +m[i][3];
+                        data.episode = +m[i][4];
+                        data.url = m[i][1];
+                        item = page.appendItem(PREFIX + ":play:" + escape(showtime.JSONEncode(data)), "video", {
+                            title: data.title + ' | ' + data.season + ' сезон ' + data.episode +' серия'
                         });
                         if (service.thetvdb) {
                             item.bindVideoMetadata({
-                                title: m2[1].trim(),
-                                season: +m2[2],
-                                episode: +m2[3]
+                                title: data.title,
+                                season: data.season,
+                                episode: data.episode
                             });
                         }
                     }
                 }
             }
+
         } catch (ex) {
             page.error("Failed to process page");
             e(ex);
@@ -343,34 +357,36 @@
         page.loading = false;
     });
     // Play links
-    plugin.addURI(PREFIX + ":play:(.*):(.*)", function(page, url, title) {
-        var s = unescape(title).split(' | ');
-        var JSON = showtime.JSONDecode(showtime.httpReq('http://query.yahooapis.com/v1/public/yql?q=use%20%22store%3A%2F%2FcruFRRY1BVjVHmIw4EPyYu%22%20as%20Untitled%3B%20SELECT%20Series.seriesid%20FROM%20Untitled%20WHERE%20seriesname%3D%22' + encodeURIComponent(s[0].trim()) + '%22%20and%20language%3D%22ru%22%20|%20truncate%28count%3D1%29&format=json'));
+    plugin.addURI(PREFIX + ":play:(.*)", function(page, data) {
+        var canonicalUrl = PREFIX + ":play:" + (data);
+        data = showtime.JSONDecode(unescape(data));
+        p(data)
+    //plugin.addURI(PREFIX + ":play:(.*):(.*)", function(page, url, title) {
+//        var s = unescape(title).split(' | ');
+if (data.season) {
+
+        var JSON = showtime.JSONDecode(showtime.httpReq('http://query.yahooapis.com/v1/public/yql?q=use%20%22store%3A%2F%2FcruFRRY1BVjVHmIw4EPyYu%22%20as%20Untitled%3B%20SELECT%20Series.seriesid%20FROM%20Untitled%20WHERE%20seriesname%3D%22' + encodeURIComponent(data.title) + '%22%20and%20language%3D%22ru%22%20|%20truncate%28count%3D1%29&format=json'));
         p(JSON.query.results.Data.Series.seriesid);
+    }
         //var imdbid = getIMDBid(s[0] + ' S'+match(/([0-9]+(?:\.[0-9]*)?)/, s[2], 1) + ' Ep'+match(/([0-9]+(?:\.[0-9]*)?)/, s[3], 1))
         // p(imdbid)
-        var video = get_video_link(url);
+        var video = get_video_link(data.url);
         //var imdbid = match(/http:\/\/www.imdb.com\/title\/(tt\d+).*?<\/a>/, showtime.httpReq('http://www.google.com/search?q=imdb+' + encodeURIComponent(s[0]).toString(), {
         //    debug: true
         //}), 1);
-        var sp = video.split('|');
-        if (sp[1]) {
-            video = sp[0];
-            s[0] = sp[1];
-            //code
-        }
         //if (showtime.probe(video).result === 0) {
         page.type = "video";
-        page.title = unescape(title);
+        page.title = data.title;
         page.source = "videoparams:" + showtime.JSONEncode({
+            canonicalUrl: canonicalUrl,
             //subscan
-            title: s[0],
+            title: data.eng_title,
             //imdbid: imdbid ? imdbid : '<unknown>',
-            year: match(/([0-9]+(?:\.[0-9]*)?)/, s[1], 1) ? match(/([0-9]+(?:\.[0-9]*)?)/, s[1], 1) : 0,
-            season: match(/([0-9]+(?:\.[0-9]*)?)/, s[2], 1) ? match(/([0-9]+(?:\.[0-9]*)?)/, s[2], 1) : -1,
-            episode: match(/([0-9]+(?:\.[0-9]*)?)/, s[3], 1) ? match(/([0-9]+(?:\.[0-9]*)?)/, s[3], 1) : -1,
+            year: data.year ? data.year : 0,
+            season: data.season ? data.season : -1,
+            episode: data.episode ? data.episode : -1,
             no_fs_scan: true,
-            canonicalUrl: PREFIX + ":play:" + url + ":" + title,
+            
             sources: [{
                 url: video,
                 mimetype: 'video'
