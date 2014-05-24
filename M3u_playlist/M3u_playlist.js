@@ -14,7 +14,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.2
+//ver 0.3
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -43,7 +43,7 @@
              service.pl = pl.input
         } 
         var v = showtime.httpReq(service.pl).toString();
-        var re = /#EXTINF:.*,\s*(.*)\s*(http:\/\/.+\s*)/g;
+        var re = /#EXTINF:[0-9]+,(.*?)[\r\n|\n](.*)/g;
         var m = re.execAll(v.toString());
         for (var i = 0; i < m.length; i++) {
             page.appendItem(m[i][2], "video", {
