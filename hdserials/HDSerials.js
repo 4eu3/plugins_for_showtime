@@ -16,13 +16,13 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8.5 API
+//ver 0.8.6 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
     var BASE_URL = 'http://hdserials.galanov.net';
     var logo = plugin.path + "img/logo.png";
-    var USER_AGENT = 'Android;HD Serials v.1.8.4;ru-RU;google Nexus 4;SDK 10;v.2.3.3(REL)';
+    var USER_AGENT = 'Android;HD Serials v.1.10.0;ru-RU;google Nexus 4;SDK 10;v.2.3.3(REL)';
     plugin.addHTTPAuth("http:\/\/.*.galanov.net.*", function(authreq) {
         authreq.setHeader("User-Agent", USER_AGENT);
     });
@@ -403,22 +403,22 @@
                 if (m[2]) {
                     //well, same here
                     //except I've never seen such videos. Just in case...
-                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[2]);
+                    result_url = 'hls:' +  m[2];
                 } else {
-                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[m.length - 1]);
+                    result_url = 'hls:' + m[m.length - 1];
                     showtime.notify(qualityNotAvailableError, 5);
                 }
                 break;
             case '2':
                 if (m[1]) {
-                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[1]);
+                    result_url = 'hls:' + m[1];
                 } else {
-                    result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[m.length - 1]);
+                    result_url = 'hls:' + m[m.length - 1];
                 }
                 break;
             case '3':
                 //let's assume that at least one item is available
-                result_url = 'hls:' + JSON.manifest_m3u8.replace('index.m3u8', m[0]);
+                result_url = 'hls:' + m[0];
                 break;
             }
         }
