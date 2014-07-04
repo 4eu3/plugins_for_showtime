@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.3.6
+//ver 0.4
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -66,11 +66,12 @@
     plugin.addURI(PREFIX + ":start", function(page) {
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
-        if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
-        else {
-            page.error("TOS not accepted. plugin disabled");
-            return;
-        };
+        if (!service.tosaccepted)
+            if (showtime.message(tos, true, true)) service.tosaccepted = 1;
+            else {
+                page.error("TOS not accepted. plugin disabled");
+                return;
+            }
         var v, re, m, i;
         //page.loading = true;
         re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div>(.+?)<\/div>/g;
@@ -196,14 +197,13 @@
             md.icon = match(/<img itemprop="image" src="(.+?)"/, v, 1);
             md.rating = +match(/<span class="b-post__info_rates imdb">IMDb:[\S\s]+?([0-9]+(?:\.[0-9]*)?)<\/span>/, v, 1);
             md.year = +match(/http:\/\/hdrezka.tv\/year\/(\d{4})/, v, 1);
-            data.year = md.year;
+            data.year = md.year ? md.year : 0;
             md.slogan = match(/>Слоган:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.rel_date = match(/>Дата выхода:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.country = match(/>Страна:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.director = match(/>Режиссер:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.genre = match(/>Жанр:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.duration = match(/>Время:<\/td>[\S\s]+?>(.+?)<\/td>/, v, 1);
-            md.duration = getDuration(md.duration);
             md.actor = match(/>В ролях актеры:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             md.description = match(/>Описание:<\/td>[\S\s]+?<td>(.+?)<\/td>/, v, 1);
             page.metadata.title = md.title + ' (' + md.year + ')';
@@ -222,12 +222,40 @@
                 title: 'найти трейлер на YouTube'
             });
             //serials
-            //var eplist = match(/<ul id="episodes-list-(.+?)" class="b-episodes([\S\s]+?)ul>/, v, 1);
+            //serial na moonwalk
+            var moonwalk = match(/(http:\/\/moonwalk.cc\/.*?)"/, v, 1);
+            if (moonwalk) {
+                var html = showtime.httpReq(moonwalk).toString();
+                re = /<option .*value="(.*)">(.*)<\/option>/g;
+                m = re.execAll(html.match(/<select id="season"[\S\s]+?option><\/select>/));
+                for (i = 0; i < m.length; i++) {
+                    page.appendItem("", "separator", {
+                        title: new showtime.RichText(m[i][2])
+                    });
+                    var seasons = moonwalk + '?season=' + m[i][1] + '&episode=1';
+                    var html2 = showtime.httpReq(seasons).toString();
+                    m2 = re.execAll(html2.match(/<select id="episode"[\S\s]+?option><\/select>/));
+                    for (j = 0; j < m2.length; j++) {
+                        data.moonwalk = (moonwalk + '?season=' + m[i][1] + '&episode=' + m2[j][1]);
+                        data.season = +m[i][1];
+                        data.episode = m2[j][1];
+                        page.appendItem(PREFIX + ':play:' + escape(showtime.JSONEncode(data)), 'video', {
+                            title: m2[j][2],
+                            year: md.year,
+                            icon: md.icon,
+                            genre: new showtime.RichText(md.genre),
+                            duration: md.duration ? getDuration(md.duration) : '',
+                            rating: +md.rating * 10,
+                            description: new showtime.RichText((md.slogan ? coloredStr('Слоган: ', orange) + md.slogan + '\n' : '') + (md.rel_date ? coloredStr('Дата выхода: ', orange) + md.rel_date + ' ' : '') + (md.country ? coloredStr(' Страна: ', orange) + md.country + '\n' : '') + (md.director ? coloredStr('Режиссер: ', orange) + md.director + ' ' : '') + (md.actor ? '\n' + coloredStr('В ролях актеры: ', orange) + md.actor + '\n' : '') + (md.description ? '\n ' + md.description + '\n' : ''))
+                        });
+                    }
+                }
+            }
+            // serial na hdrezke
             var eplist = match(/<ul id="episodes-list-(.+?)" class="b-episodes__list clearfix">([\S\s]+?)ul>/, v, 1);
             if (eplist) {
                 // if (link.indexOf('/series/') != -1) {
                 re = /<ul id="episodes-list-(.+?)" class="b-episodes__list([\S\s]+?)ul>/g;
-                p()
                 m = re.execAll(v.match(/<div class="b-episodes__wrapper">[\S\s]+?<div class="b-content__columns/));
                 for (i = 0; i < m.length; i++) {
                     page.appendItem("", "separator", {
@@ -243,7 +271,7 @@
                             year: md.year,
                             icon: BASE_URL + m2[j][4],
                             genre: new showtime.RichText(md.genre),
-                            duration: md.duration,
+                            duration: md.duration ? getDuration(md.duration) : '',
                             rating: +md.rating * 10,
                             description: new showtime.RichText((md.slogan ? coloredStr('Слоган: ', orange) + md.slogan + '\n' : '') + (md.rel_date ? coloredStr('Дата выхода: ', orange) + md.rel_date + ' ' : '') + (md.country ? coloredStr(' Страна: ', orange) + md.country + '\n' : '') + (md.director ? coloredStr('Режиссер: ', orange) + md.director + ' ' : '') + (md.actor ? '\n' + coloredStr('В ролях актеры: ', orange) + md.actor + '\n' : '') + (md.description ? '\n ' + md.description + '\n' : ''))
                         });
@@ -258,8 +286,7 @@
                 }
             } else
             //films
-            /* if (link.indexOf('/films/') != -1)*/
-            {
+            if (link.indexOf('/films/') !== -1) {
                 page.appendItem("", "separator", {
                     title: new showtime.RichText('Фильм:')
                 });
@@ -272,7 +299,7 @@
                     imdbid: md.imdbid,
                     icon: md.icon,
                     genre: new showtime.RichText(md.genre),
-                    duration: md.duration,
+                    duration: md.duration ? getDuration(md.duration) : '',
                     rating: +md.rating * 10,
                     description: new showtime.RichText((md.slogan ? coloredStr('Слоган: ', orange) + md.slogan + '\n' : '') + (md.rel_date ? coloredStr('Дата выхода: ', orange) + md.rel_date + ' ' : '') + (md.country ? coloredStr(' Страна: ', orange) + md.country + '\n' : '') + (md.director ? coloredStr('Режиссер: ', orange) + md.director + ' ' : '') + (md.actor ? '\n' + coloredStr('В ролях актеры: ', orange) + md.actor + '\n' : '') + (md.description ? '\n ' + md.description + '\n' : ''))
                 });
@@ -288,7 +315,7 @@
                 page.appendItem("", "separator", {
                     title: new showtime.RichText(sidetitle.replace(' бесплатные', '').replace('Смотреть п', 'П'))
                 });
-                re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div.*>(.+?)<\/div>/g
+                re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div.*>(.+?)<\/div>/g;
                 m = re.execAll(v);
                 for (i = 0; i < m.length; i++) {
                     page.appendItem(PREFIX + ":page:" + m[i][1], "video", {
@@ -356,7 +383,6 @@
     plugin.addURI(PREFIX + ":play:(.*)", function(page, data) {
         var canonicalUrl = PREFIX + ":play:" + (data);
         data = showtime.JSONDecode(unescape(data));
-
         var video = get_video_link(data);
         page.type = "video";
         page.title = data.title;
@@ -387,10 +413,10 @@
             v = showtime.httpReq(BASE_URL, {
                 debug: true,
                 args: {
-                    do: 'search',
+                    do :'search',
                     subaction: 'search',
                     q: query
-                    //q: encodeURIComponent(showtime.entityDecode(query))
+                        //q: encodeURIComponent(showtime.entityDecode(query))
                 }
             });
             re = /data-url="http:\/\/hdrezka.tv(.+?)"[\S\s]+?<img src="([^"]+)[\S\s]+?item-link[\S\s]+?">([^<]+)[\S\s]+?<div>(.+?)<\/div>/g;
@@ -411,44 +437,54 @@
     });
 
     function get_video_link(data) {
-        var v, result_url;
-        try {
-            if (data.season) {
-                v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
-                    postdata: {
-                        id: data.id,
-                        season: data.season ? data.season : '',
-                        episode: data.episode ? data.episode : ''
-                    }
-                }).toString());
-                data.links = showtime.JSONDecode(v.link);
-            } else {
-                v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
-                    postdata: {
-                        id: data.id
-                    }
-                }).toString());
-                p(v)
-                if (match(/src="(.+?)"/, v.link, 1)) {
-                    return match(/setFlash\('([^']+)/, showtime.httpReq(match(/src="(.+?)"/, v.link, 1)).toString(), 1).replace('/manifest.f4m', '/index.m3u8');
+            var v, result_url;
+            try {
+                if (data.moonwalk) {
+                    v = showtime.httpReq(data.moonwalk).toString();
+                    var JSON = showtime.JSONDecode(showtime.httpReq('http://moonwalk.cc/sessions/create_session', {
+                        debug: true,
+                        postdata: {
+                            video_token: /video_token: '(.+?)'/.exec(v)[1],
+                            video_secret: /video_secret: '(.+?)'/.exec(v)[1]
+                        }
+                    }));
+                    return JSON.manifest_m3u8;
                 }
-                data.links = showtime.JSONDecode(v.link);
+                if (data.season) {
+                    v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
+                        postdata: {
+                            id: data.id,
+                            season: data.season ? data.season : '',
+                            episode: data.episode ? data.episode : ''
+                        }
+                    }).toString());
+                    data.links = showtime.JSONDecode(v.link);
+                } else
+                if (!data.season) {
+                    v = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/engine/ajax/getvideo.php', {
+                        postdata: {
+                            id: data.id
+                        }
+                    }).toString());
+                    if (match(/src="(.+?)"/, v.link, 1)) {
+                        return match(/setFlash\('([^']+)/, showtime.httpReq(match(/src="(.+?)"/, v.link, 1)).toString(), 1).replace('/manifest.f4m', '/index.m3u8');
+                    }
+                    data.links = showtime.JSONDecode(v.link);
+                }
+                if (service.Format == 'mp4') {
+                    result_url = data.links.mp4;
+                } else result_url = data.links.hls;
+                showtime.trace("Video Link: " + result_url);
+            } catch (err) {
+                e(err);
+                e(err.stack);
             }
-            //            p(data);
-            if (service.Format == 'mp4') {
-                result_url = data.links.mp4;
-            } else result_url = data.links.hls;
-            showtime.trace("Video Link: " + result_url);
-        } catch (err) {
-            e(err);
-            e(err.stack);
+            return result_url;
         }
-        return result_url;
-    }
-    //
-    //extra functions
-    //
-    // Add to RegExp prototype
+        //
+        //extra functions
+        //
+        // Add to RegExp prototype
 
     function getIMDBid(title) {
         p(encodeURIComponent(showtime.entityDecode(unescape(title))).toString());
@@ -497,7 +533,8 @@
             return this.replace(/^\s+|\s+$/g, '');
         };
     }
-    const blue = "6699CC", orange = "FFA500";
+    const blue = "6699CC",
+        orange = "FFA500";
 
     function colorStr(str, color) {
         return '<font color="' + color + '">(' + str + ')</font>';
@@ -529,14 +566,7 @@
     }
 
     function p(message) {
-        if (typeof(message) === 'object') message = showtime.JSONEncode(message);
-        showtime.print(message);
-    }
-
-    function trace(msg) {
-        if (service.debug == '1') {
-            t(msg);
-            p(msg);
-        }
+        if (typeof(message) === 'object') message = '### object ###' + '\n' + showtime.JSONEncode(message) + '\n' + '### object ###';
+        if (service.debug) showtime.print(message);
     }
 })(this);
