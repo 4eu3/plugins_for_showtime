@@ -13,6 +13,7 @@ PLUGINS= \
 	couchtuner.eu.zip \
         vkvideos.zip \
 	DreamFilm.zip \
+	HDRezka.zip \
 
 %.zip:
 	@echo "Bundle plugin '$*'"
