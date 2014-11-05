@@ -13,6 +13,7 @@ PLUGINS= \
 	couchtuner.eu.zip \
         vkvideos.zip \
 	DreamFilm.zip \
+        M3u_playlist.zip \
 	HDRezka.zip \
 
 %.zip:

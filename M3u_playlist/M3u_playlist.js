@@ -14,7 +14,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.3
+//ver 0.4
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -25,12 +25,12 @@
     var settings = plugin.createSettings(plugin_info.title, logo, plugin_info.synopsis);
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
-    
-    settings.createBool("debug", "Debug", false, function(v) {
-        service.debug = v;
-    });
-    
-    settings.createString("M3u Playlist", "playlist Source", "", function(v) {
+
+    //settings.createBool("debug", "Debug", false, function(v) {
+    //    service.debug = v;
+    //});
+
+    settings.createString("M3u Playlist", "playlist Source", "http://peers.tv/services/iptv/playlist.m3u", function(v) {
         service.pl = v;
     });
 
@@ -39,37 +39,26 @@
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
         if (service.pl == '') {
-             var pl = showtime.textDialog('play list location: ', true, false);
-             service.pl = pl.input
-        } 
-        var v = showtime.httpReq(service.pl).toString();
-        var re = /#EXTINF:[0-9]+,(.*?)[\r\n|\n](.*)/g;
-        var m = re.execAll(v.toString());
-        for (var i = 0; i < m.length; i++) {
-            page.appendItem(m[i][2], "video", {
-                title: new showtime.RichText(m[i][1])
+            var pl = showtime.textDialog('play list location: ', true, false);
+            service.pl = pl.input
+        }
+        var respond = showtime.httpReq(service.pl).toString();
+        var re = /#EXTINF:.[0-9].*,(.*?)[\r\n|\n](.*)/g;
+        var m = re.exec(respond);
+        while (m) {
+            page.appendItem(m[2].trim(), "video", {
+                title: new showtime.RichText(m[1].trim())
             });
+            m = re.exec(respond);
         }
         page.type = "directory";
         page.contents = "items";
         page.loading = false;
     });
-    //
-    //extra functions
-    //
-    // Add to RegExp prototype
-    RegExp.prototype.execAll = function(string) {
-        var matches = [];
-        var match = null;
-        while ((match = this.exec(string)) !== null) {
-            var matchArray = [];
-            for (var i in match) {
-                if (parseInt(i, 10) == i) {
-                    matchArray.push(match[i]);
-                }
-            }
-            matches.push(matchArray);
-        }
-        return matches;
-    };
+    
+        if (!String.prototype.trim) {
+        String.prototype.trim = function() {
+            return this.replace(/^\s+|\s+$/g, '');
+        };
+    }
 })(this);
