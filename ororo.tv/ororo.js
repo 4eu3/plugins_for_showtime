@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.5
+//ver 0.5.6
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -88,10 +88,10 @@
     plugin.addURI(PREFIX + ":start", function(page) {
         var i, v, remember_user_token;
         if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
-        else {
-            page.error("TOS not accepted. plugin disabled");
-            return;
-        }
+            else {
+                page.error("TOS not accepted. plugin disabled");
+                return;
+            }
         if (service.arrayview) page.metadata.glwview = plugin.path + "views/array2.view";
         page.metadata.logo = logo;
         page.metadata.title = PREFIX;
@@ -300,13 +300,15 @@
             episode: s[3],
             canonicalUrl: PREFIX + ":play:" + url + ":" + title,
             sources: [{
-                url: video.url.replace('.webm', service.Format)
-            }],
+                    url: video.url.replace('.webm', service.Format)
+                }
+            ],
             subtitles: service.subs === true ? ([{
-                url: video.sub,
-                language: 'English',
-                title: match(/subtitle\/.+?\/(.+)/, video.sub)
-            }]) : ''
+                    url: video.sub,
+                    language: 'English',
+                    title: match(/subtitle\/.+?\/(.+)/, video.sub)
+                }
+            ]) : ''
         };
         page.source = "videoparams:" + showtime.JSONEncode(videoparams);
         page.loading = false;
@@ -325,7 +327,8 @@
                 }
             });
             video.url = match(/<source src='\/(.*?)' type='video/, v, 1) ? BASE_URL + match(/<source src='\/(.*?)' type='video/, v, 1) : match(/<source src='(.*?)' type='video/, v, 1);
-            video.sub = BASE_URL + match(/subtitles on' src='\/(.*)' srclang/, v, 1);
+            //<track default kind='subtitles' label='en' src='/uploads/subtitle/file/19219/Bob_s_Burgers_-_01x05_-_Hamburger_Dinner_Theater.LOL.English.HI.C.updated.Addic7ed.com.srt' srclang='en'>
+            video.sub = BASE_URL + match(/subtitles'.[\s\S]{0,300} src='\/(.*)' srclang/, v, 1);
         } catch (err) {
             e(err);
         }

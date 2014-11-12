@@ -8,7 +8,7 @@ PLUGINS= \
         kaban.tv.zip \
 	kino-dom.tv.zip \
         krasview.zip \
-        ororo.tv \
+        ororo.tv.zip \
 	video.az.zip \
 	couchtuner.eu.zip \
         vkvideos.zip \

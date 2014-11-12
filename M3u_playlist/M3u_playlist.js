@@ -20,7 +20,7 @@
     var PREFIX = plugin_info.id;
     var logo = plugin.path + 'logo.png';
     // Register a service (will appear on home page)
-    var service = plugin.createService(plugin_info.title, PREFIX + ":start:" + service.pl, "video", true, logo);
+    var service = plugin.createService(plugin_info.title, PREFIX + ":start", "video", true, logo);
     //settings
     var settings = plugin.createSettings(plugin_info.title, logo, plugin_info.synopsis);
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
@@ -35,7 +35,7 @@
     });
 
     //First level start page
-    plugin.addURI(PREFIX + ":start", function(page, pl) {
+    plugin.addURI(PREFIX + ":start", function(page) {
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
         if (service.pl == '') {
