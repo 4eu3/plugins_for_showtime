@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2013 Buksa
+ *  Copyright (C) 2014 Buksa
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -14,36 +14,42 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.4
+//ver 1.1
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
     var logo = plugin.path + 'logo.png';
     // Register a service (will appear on home page)
-    var service = plugin.createService(plugin_info.title, PREFIX + ":start", "video", true, logo);
+    var service = plugin.createService(plugin_info.title, PREFIX + ":start:" + service.pl, "video", true, logo);
     //settings
     var settings = plugin.createSettings(plugin_info.title, logo, plugin_info.synopsis);
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
     settings.createDivider('Settings:');
 
-    //settings.createBool("debug", "Debug", false, function(v) {
-    //    service.debug = v;
-    //});
+    settings.createBool("debug", "Debug", false, function(v) {
+        service.debug = v;
+    });
 
-    settings.createString("M3u Playlist", "playlist Source", "http://peers.tv/services/iptv/playlist.m3u", function(v) {
+    settings.createString("M3u Playlist", "playlist Source", "http://api.torrent-tv.ru/k/wumGpQ39Ef/4", function(v) {
         service.pl = v;
     });
 
     //First level start page
-    plugin.addURI(PREFIX + ":start", function(page) {
+    plugin.addURI(PREFIX + ":start", function(page, pl) {
         page.metadata.logo = plugin.path + "logo.png";
         page.metadata.title = PREFIX;
         if (service.pl == '') {
-            var pl = showtime.textDialog('play list location: ', true, false);
+            pl = showtime.textDialog('play list location: ', true, false);
             service.pl = pl.input
         }
-        var respond = showtime.httpReq(service.pl).toString();
-        var re = /#EXTINF:.[0-9].*,(.*?)[\r\n|\n](.*)/g;
+        var respond = showtime.httpReq(service.pl, {
+            debug: service.debug/*,
+            method: 'GET',
+            headers: {
+                'User-Agent': USER_AGENT
+            }*/
+        }).toString();
+        var re = /#EXTINF:.*,(.*?)[\r\n|\n](.*)/g
         var m = re.exec(respond);
         while (m) {
             page.appendItem(m[2].trim(), "video", {
@@ -55,8 +61,8 @@
         page.contents = "items";
         page.loading = false;
     });
-    
-        if (!String.prototype.trim) {
+
+    if (!String.prototype.trim) {
         String.prototype.trim = function() {
             return this.replace(/^\s+|\s+$/g, '');
         };
