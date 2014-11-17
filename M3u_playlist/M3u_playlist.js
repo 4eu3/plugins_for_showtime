@@ -14,7 +14,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 1.1
+//ver 1.2
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -30,7 +30,8 @@
         service.debug = v;
     });
 
-    settings.createString("M3u Playlist", "playlist Source", "http://api.torrent-tv.ru/k/wumGpQ39Ef/4", function(v) {
+    //settings.createString("M3u Playlist", "playlist Source", "https://dl.dropboxusercontent.com/u/94263272/pl.txt", function(v) {
+    settings.createString("Playlist", "playlist Source", "http://peers.tv/services/iptv/playlist.m3u", function(v) {
         service.pl = v;
     });
 
@@ -43,16 +44,16 @@
             service.pl = pl.input
         }
         var respond = showtime.httpReq(service.pl, {
-            debug: service.debug/*,
-            method: 'GET',
-            headers: {
-                'User-Agent': USER_AGENT
-            }*/
+            debug: service.debug
         }).toString();
-        var re = /#EXTINF:.*,(.*?)[\r\n|\n](.*)/g
+        p('Respond:')
+        p(respond)
+        var re = /#EXTINF:.*,(.*?)(\r\n|\n)(.*)(\r\n|\n|$)/g;
         var m = re.exec(respond);
         while (m) {
-            page.appendItem(m[2].trim(), "video", {
+            p("title: " + m[1])
+            p('url: ' + m[3])
+            page.appendItem(m[3].trim(), "video", {
                 title: new showtime.RichText(m[1].trim())
             });
             m = re.exec(respond);
@@ -66,5 +67,10 @@
         String.prototype.trim = function() {
             return this.replace(/^\s+|\s+$/g, '');
         };
+    }
+
+    function p(message) {
+        if (typeof(message) === 'object') message = '### object ###' + '\n' + showtime.JSONEncode(message) + '\n' + '### object ###';
+        if (service.debug) print(message);
     }
 })(this);
