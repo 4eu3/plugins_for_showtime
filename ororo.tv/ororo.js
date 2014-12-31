@@ -16,12 +16,14 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.6
+//ver 0.5.7
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
     var BASE_URL = 'http://ororo.tv/';
     var logo = plugin.path + plugin_info.icon;
+    var loggedIn = false;
+
     var tos = 'The developer has no affiliation with the sites what so ever.\n';
     tos += 'Nor does he receive money or any other kind of benefits for them.\n\n';
     tos += 'The software is intended solely for educational and testing purposes,\n';
@@ -68,6 +70,7 @@
     settings.createMultiOpt("Format", "Format", Format, function(v) {
         service.Format = v;
     });
+    p(showtime.currentVersionInt)
     if (showtime.currentVersionInt >= 4 * 10000000 + 3 * 100000 + 261) {
         plugin.addItemHook({
             title: "Search in Another Apps",
@@ -84,6 +87,51 @@
         authreq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
         authreq.setCookie("video", "true");
     });
+
+    function login(query, authenticity_token) {
+        if (loggedIn)
+            return false;
+        var reason = "Login required";
+        var do_query = false;
+        while (1) {
+            var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
+            if (!credentials) {
+                if (query && !do_query) {
+                    do_query = true;
+                    continue;
+                }
+                return "No credentials";
+            }
+            if (credentials.rejected)
+                return "Rejected by user";
+            var v = showtime.httpReq("http://ororo.tv/users/sign_in", {
+                postdata: {
+                    utf8: '✓',
+                    authenticity_token: authenticity_token,
+                    'user[email]': credentials.username,
+                    'user[password]': credentials.password,
+                    'user[remember_me]': 0,
+                    'user[remember_me]': 1
+                },
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.4 (KHTML, like Gecko) Chrome/22.0.1106.240 YaBrowser/1.5.1106.240 Safari/537.4',
+                    'Host': 'ororo.tv',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ru,en;q=0.9'
+                }
+            }).toString();
+
+            if (v.match(/error message[\s\S]+?header'>([\s\S]+)</)) {
+                reason = v.match(/error message[\s\S]+?header'>([\s\S]+?)</)[1].trim()
+                p(reason)
+                do_query = true;
+                continue;
+            }
+            showtime.trace('Logged in to Ororo.tv as user: ' + credentials.username);
+            loggedIn = true;
+            return false;
+        }
+    }
     //First level start page
     plugin.addURI(PREFIX + ":start", function(page) {
         var i, v, remember_user_token;
@@ -98,82 +146,13 @@
         pageMenu(page);
         items = [];
         items_tmp = [];
-        v = showtime.httpReq(BASE_URL + 'users/sign_in', {
-            debug: service.debug,
-            //noFollow: true,
-            headers: {
-                'Host': 'ororo.tv',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate'
-            }
-        }).toString();
-        if (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)) {
-            var authenticity_token = (/<input name="authenticity_token" type="hidden" value="(.*?)" \/>/.exec(v)[1]);
-            var reason = "Login required";
-            var do_query = false;
-            while (1) {
-                var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
-                if (credentials) {
-                    if (credentials.rejected) {
-                        page.loading = false;
-                        page.error("This plugin requires the account to be logged in. You can get at www.ororo.tv plugin disabled");
-                        return;
-                    }
-                    if (!credentials) {
-                        if (!do_query) {
-                            do_query = true;
-                        }
-                    }
-                    if (credentials.username === "" || credentials.password === "") {
-                        if (!do_query) {
-                            do_query = true;
-                        }
-                    }
-                    v = showtime.httpReq('http://ororo.tv/users/sign_in', {
-                        debug: service.debug,
-                        noFollow: true,
-                        postdata: {
-                            utf8: '✓',
-                            authenticity_token: authenticity_token,
-                            'user[email]': credentials.username,
-                            'user[password]': credentials.password,
-                            'user[remember_me]': 1,
-                            commit: '%D0%92%D0%BE%D0%B9%D1%82%D0%B8'
-                        },
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.4 (KHTML, like Gecko) Chrome/22.0.1106.240 YaBrowser/1.5.1106.240 Safari/537.4',
-                            'Host': 'ororo.tv',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                            'Accept-Language': 'ru,en;q=0.9'
-                        }
-                    });
-                    if (v.multiheaders['Set-Cookie']) {
-                        remember_user_token = (getCookie('remember_user_token', v.multiheaders) ? getCookie('remember_user_token', v.multiheaders) : '');
-                    }
-                    if (remember_user_token) {
-                        v = showtime.httpReq(BASE_URL, {
-                            debug: service.debug,
-                            //noFollow: true,
-                            headers: {
-                                'Host': 'ororo.tv',
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0',
-                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                'Accept-Language': 'en-US,en;q=0.5',
-                                'Accept-Encoding': 'gzip, deflate',
-                                'Referer': 'http://ororo.tv/users/sign_in' //,
-                                // 'Cookie': this.id+'; '+this._ororo_session+'; '+this.remember_user_token
-                            }
-                        })
-                        break;
-                    }
-                }
-                reason = "Wrong username/password.";
-                do_query = true;
-            }
+        var v = showtime.httpReq(BASE_URL).toString()
+        if (v.match('error message')) {
+            if (v.match(/<meta content="(.*?)" name="csrf-token"/))
+                var authenticity_token = v.match(/<meta content="(.*?)" name="csrf-token"/)[1]
+            login(true, authenticity_token)
         }
-        v = v.toString()
+        var v = showtime.httpReq(BASE_URL).toString()
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
         var show = v.split("<div class='index show");
         for (i = 1; i < show.length; i++) {
@@ -340,10 +319,10 @@
             page.metadata.background = plugin.path + "views/img/background.png";
             page.metadata.backgroundAlpha = 0.5;
         }
-        page.appendAction("pageevent", "sortDateDec", true, {
-            title: "Sort by Date (Decrementing)",
-            icon: plugin.path + "views/img/sort_date_dec.png"
-        });
+        //page.appendAction("pageevent", "sortDateDec", true, {
+        //    title: "Sort by Date (Decrementing)",
+        //    icon: plugin.path + "views/img/sort_date_dec.png"
+        //});
         page.appendAction("pageevent", "sortViewsDec", true, {
             title: "Sort by Views (Decrementing)",
             icon: plugin.path + "views/img/sort_views_dec.png"
