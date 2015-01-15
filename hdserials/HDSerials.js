@@ -1,7 +1,7 @@
 /**
  *  HDSerials plugin for Showtime
  *
- *  Copyright (C) 2014 Buksa, Wain
+ *  Copyright (C) 2015 Buksa, Wain
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.8.6 API
+//ver 0.9 API
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -56,7 +56,7 @@
         ['0', 'Auto', true],
         ['1', '720p'],
         ['2', '480p'],
-        ['3', '360p']
+        ['3', '360p'],
     ];
     settings.createDivider('Video Settings');
     settings.createMultiOpt("Resolution", "Разрешение", Resolution, function(v) {
@@ -73,9 +73,13 @@
     settings.createBool("Show_finished", "Показывать сообщение о достижении конца директории", true, function(v) {
         service.showEndOfDirMessage = v;
     });
+    settings.createBool("debug", "Debug", false, function(v) {
+        service.debug = v;
+    });
     var qualityNotAvailableError = "Невозможно открыть видео в " + Resolution[service.Resolution][1] + ", используется максимально доступное качество";
 
     function startPage(page) {
+
         var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
             method: 'POST',
             headers: {
@@ -112,10 +116,14 @@
                 id: id
             }
         }));
+        p(JSON)
         for (var i in JSON.data) {
             page.appendItem(PREFIX + ':filter-videos:' + JSON.data[i].video_id + ':' + escape(JSON.data[i].video_title_ru + (JSON.data[i].video_season ? " " + JSON.data[i].video_season : "")), "video", {
-                title: new showtime.RichText(JSON.data[i].video_title_ru + (JSON.data[i].video_title_en ? " / " + JSON.data[i].video_title_en : "") + (JSON.data[i].video_season ? " " + JSON.data[i].video_season : "")),
-                description: new showtime.RichText(JSON.data[i].date + ' ' + JSON.data[i].title + '\n' + JSON.data[i].video_title_ru + (JSON.data[i].video_title_en ? " / " + JSON.data[i].video_title_en : "") + (JSON.data[i].video_season ? " " + JSON.data[i].video_season : "")),
+                title: new showtime.RichText(JSON.data[i].video_title_ru + (JSON.data[i].video_title_en ? " / " + JSON.data[i].video_title_en : "") +
+                                            (JSON.data[i].video_season ? " " + JSON.data[i].video_season : "")),
+                
+                description: new showtime.RichText( '<p align="justify">'+coloredStr('Обнавлено: ', orange)+ JSON.data[i].date + ' ' + JSON.data[i].title +'</p>'
+                                                   +'\n' + coloredStr('Название: ', orange)+JSON.data[i].video_title_ru + (JSON.data[i].video_title_en ? " / " + JSON.data[i].video_title_en : "") + (JSON.data[i].video_season ? " " + JSON.data[i].video_season : "")),
                 icon: JSON.data[i].video_image_file
             });
             counter++;
@@ -137,9 +145,9 @@
         }));
         for (i in JSON.data) {
             if (JSON.data[i].video_count !== '0') page.appendItem(PREFIX + ':' + JSON.id + ':' + JSON.data[i].id + ':' + escape(JSON.data[i].title_ru) + ':' + JSON.data[i].video_count, 'directory', {
-                title: new showtime.RichText(JSON.data[i].title_ru + blueStr(JSON.data[i].video_count)),
-                icon: logo
-            });
+                    title: new showtime.RichText(JSON.data[i].title_ru + blueStr(JSON.data[i].video_count)),
+                    icon: logo
+                });
         }
         setPageHeader(page, unescape(title));
     });
@@ -153,18 +161,17 @@
             requestNumber = 0;
         //trying to implement a delay function to prevent server overload when fast scrolling
         //returns value of time before next request can be made, or zero if the request can be made immediately
-
-        function countDelay(delay) {
-            //showtime.print('Getting difference between:' + lastRequest + " and " + showtime.time());
-            var timeDiff = getTimeDifference(lastRequest, showtime.time()) * 1000;
-            //showtime.print("time sinse last call:" + timeDiff);
-            if (timeDiff < delay) {
-                //wait for the delay time to end
-                return delay - timeDiff;
-            } else {
-                return 0;
-            }
-        }
+        //function countDelay(delay) {
+        //    //showtime.print('Getting difference between:' + lastRequest + " and " + showtime.time());
+        //    var timeDiff = getTimeDifference(lastRequest, showtime.time()) * 1000;
+        //    //showtime.print("time sinse last call:" + timeDiff);
+        //    if (timeDiff < delay) {
+        //        //wait for the delay time to end
+        //        return delay - timeDiff;
+        //    } else {
+        //        return 0;
+        //    }
+        //}
 
         function loader() {
             if (!requestFinished) {
@@ -181,34 +188,34 @@
             var JSON;
             var delay = countDelay(service.requestMinDelay * 1000);
             var loadJSON = function() {
-                    try {
-                        lastRequest = showtime.time();
-                        requestFinished = false;
-                        //showtime.print("Time to make some requests now!");
-                        var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
-                            method: 'POST',
-                            headers: {
-                                'User-Agent': USER_AGENT
-                            },
-                            args: {
-                                id: 'filter-videos',
-                                category: category_id,
-                                fresh: 1,
-                                start: offset,
-                                limit: service.requestQuantity
-                            }
-                        }));
-                        requestFinished = true;
-                        requestNumber++;
-                        //showtime.print("Request finished!. Got " + JSON.data.length);
-                        return JSON;
-                    } catch (err) {
-                        showtime.notify("Подгрузка контента не удалась. Возможно, сервер не ответил вовремя.", 5);
-                        return false;
-                    }
-                };
+                try {
+                    lastRequest = Date.now();
+                    requestFinished = false;
+                    //showtime.print("Time to make some requests now!");
+                    var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
+                        method: 'POST',
+                        headers: {
+                            'User-Agent': USER_AGENT
+                        },
+                        args: {
+                            id: 'filter-videos',
+                            category: category_id,
+                            fresh: 1,
+                            start: offset,
+                            limit: service.requestQuantity
+                        }
+                    }));
+                    requestFinished = true;
+                    requestNumber++;
+                    //showtime.print("Request finished!. Got " + JSON.data.length);
+                    return JSON;
+                } catch (err) {
+                    showtime.notify("Подгрузка контента не удалась. Возможно, сервер не ответил вовремя.", 5);
+                    return false;
+                }
+            };
             //showtime.print("Let's wait " + delay + " msec before making a request!");
-            showtime.sleep(delay);
+            sleep(delay);
             JSON = loadJSON();
             if (!JSON) return false;
             for (var i in JSON.data) {
@@ -238,6 +245,7 @@
                 video: id
             }
         }));
+        p(JSON)
         if (JSON.data.genres) {
             genres = "";
             for (i in JSON.data.genres) {
@@ -267,33 +275,36 @@
             }
         }
         if (JSON.data.files.length > 1) {
-            for (i = 0; i < JSON.data.files[JSON.data.files.length - 1].season; i++) {
-                page.appendItem("", "separator", {
-                    title: new showtime.RichText('Сезон ' + (i + 1))
-                });
-                for (j in JSON.data.files) {
-                    if (JSON.data.files[j].season == i + 1) {
-                        data = {
-                            title: JSON.data.info.title_en,
-                            year: JSON.data.info.year,
-                            season: JSON.data.files[j].season,
-                            episode: JSON.data.files[j].episode,
-                            url: JSON.data.files[j].url
-                        };
-                        item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(showtime.JSONEncode(data)), "video", {
-                            title: new showtime.RichText(JSON.data.files[j].title),
-                            description: new showtime.RichText((JSON.data.info.translation ? coloredStr('Перевод: ', orange) + JSON.data.info.translation + '\n' : '') + (countries ? coloredStr('Страна: ', orange) + countries + '\n' : '') + (directors ? coloredStr('Режиссер: ', orange) + directors + ' ' : '') + (actors ? '\n' + coloredStr('В ролях актеры: ', orange) + actors + '\n' : '') + (JSON.data.info.description ? coloredStr('Описание: ', orange) + JSON.data.info.description : '')),
-                            duration: JSON.data.info.duration ? JSON.data.info.duration : '',
-                            rating: JSON.data.info.hd_rating * 10,
-                            genre: genres ? genres : '',
-                            year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
-                            icon: JSON.data.info.image_file ? JSON.data.info.image_file : ''
-                        });
-                    }
-                    //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
+
+            for (j in JSON.data.files) {
+                if (JSON.data.files[j].episode == 1) {
+                    p(JSON.data.files[j].season + ' ' + JSON.data.files[j].episode)
+                    page.appendItem("", "separator", {
+                        title: new showtime.RichText('Сезон ' + JSON.data.files[j].season)
+                    });
                 }
-                //code
+                data = {
+                    title: JSON.data.info.title_en,
+                    year: JSON.data.info.year,
+                    season: JSON.data.files[j].season,
+                    episode: JSON.data.files[j].episode,
+                    url: JSON.data.files[j].url
+                };
+                p(JSON.data.files[j].season)
+                item = page.appendItem(PREFIX + ':' + JSON.id + ':' + escape(showtime.JSONEncode(data)), "video", {
+                    title: new showtime.RichText(JSON.data.files[j].title + (JSON.data.files[j].season_translation ? ' (' + JSON.data.files[j].season_translation + ')' : '')),
+                    description: new showtime.RichText((JSON.data.info.translation ? coloredStr('Перевод: ', orange) + JSON.data.info.translation + (JSON.data.files[j].season_translation ? ', ' + JSON.data.files[j].season_translation : '') + '\n' : '') + (countries ? coloredStr('Страна: ', orange) + countries + '\n' : '') + (directors ? coloredStr('Режиссер: ', orange) + directors + ' ' : '') + (actors ? '\n' + coloredStr('В ролях актеры: ', orange) + actors + '\n' : '') + (JSON.data.info.description ? coloredStr('Описание: ', orange) + JSON.data.info.description : '')),
+                    duration: JSON.data.info.duration ? JSON.data.info.duration : '',
+                    rating: JSON.data.info.hd_rating * 10,
+                    genre: genres ? genres : '',
+                    year: JSON.data.info.year ? parseInt(JSON.data.info.year, 10) : '',
+                    icon: JSON.data.info.image_file ? JSON.data.info.image_file : ''
+                });
+
+                //item.bindVideoMetadata({title: JSON.data.info.title_en, season: 2, episode: parseInt(i)+1,  year: parseInt(JSON.data.info.year)})
             }
+            //code
+
         } else {
             for (i in JSON.data.files) {
                 data = {
@@ -329,13 +340,14 @@
             page.type = "video";
             page.source = "videoparams:" + showtime.JSONEncode({
                 title: data.title,
-                //season: data.season ? data.season : -1,
-                //episode: data.episode ? data.episode : -1,
+                season: data.season ? data.season : -1,
+                episode: data.episode ? data.episode : -1,
                 no_fs_scan: true,
                 canonicalUrl: canonicalUrl,
                 sources: [{
-                    url: video
-                }]
+                        url: video
+                    }
+                ]
             });
         } else {
             showtime.notify(video, 3);
@@ -362,18 +374,18 @@
             var video_max_hd = v.match("var video_max_hd = '(.*)'")[1];
             if (video_no_flv == 1) {
                 switch (video_max_hd) {
-                case "0":
-                    fname = "240.mp4";
-                    break;
-                case "1":
-                    vfname = "360.mp4";
-                    break;
-                case "2":
-                    fname = "480.mp4";
-                    break;
-                case "3":
-                    fname = "720.mp4";
-                    break;
+                    case "0":
+                        fname = "240.mp4";
+                        break;
+                    case "1":
+                        vfname = "360.mp4";
+                        break;
+                    case "2":
+                        fname = "480.mp4";
+                        break;
+                    case "3":
+                        fname = "720.mp4";
+                        break;
                 }
                 result_url = video_host + "u" + video_uid + "/videos/" + video_vtag + "." + fname;
             } else {
@@ -383,43 +395,50 @@
             }
         } else {
             v = showtime.httpReq(url).toString();
+            p(v)
             var JSON = showtime.JSONDecode(showtime.httpReq('http://moonwalk.cc/sessions/create_session', {
-                debug: true,
+                debug: service.debug,
                 postdata: {
-                    video_token: /video_token: '(.+?)'/.exec(v)[1],
-                    video_secret: /video_secret: '(.+?)'/.exec(v)[1]
+                    partner: /partner: (.*),/.exec(v)[1],
+                    d_id: /d_id: (.*),/.exec(v)[1],
+                    video_token: /video_token: '(.*)'/.exec(v)[1],
+                    stats_version: /stats_version: (.*),/.exec(v)[1],
+                    video_secret: /video_secret: '(.*)'/.exec(v)[1],
+                    content_type: /content_type: '(.*)'/.exec(v)[1]
                 }
             }));
             result_url = 'hls:' + JSON.manifest_m3u8;
+            var video_urls = showtime.httpReq(JSON.manifest_m3u8).toString()
+            p(video_urls)
             var m = /.*index.m3u8.*/g.execAll(showtime.httpReq(JSON.manifest_m3u8));
             switch (service.Resolution) {
-            case '0':
-                result_url = 'hls:' + JSON.manifest_m3u8;
-                break;
-            case '1':
-                //not each and every video contains 720p link
-                //as a workaround, play best quality available
-                //or m[2] will be undefined. This will give us 403 error on playback.
-                if (m[2]) {
-                    //well, same here
-                    //except I've never seen such videos. Just in case...
-                    result_url = 'hls:' +  m[2];
-                } else {
-                    result_url = 'hls:' + m[m.length - 1];
-                    showtime.notify(qualityNotAvailableError, 5);
-                }
-                break;
-            case '2':
-                if (m[1]) {
-                    result_url = 'hls:' + m[1];
-                } else {
-                    result_url = 'hls:' + m[m.length - 1];
-                }
-                break;
-            case '3':
-                //let's assume that at least one item is available
-                result_url = 'hls:' + m[0];
-                break;
+                case '0':
+                    result_url = 'hls:' + JSON.manifest_m3u8;
+                    break;
+                case '1':
+                    //not each and every video contains 720p link
+                    //as a workaround, play best quality available
+                    //or m[2] will be undefined. This will give us 403 error on playback.
+                    if (m[2]) {
+                        //well, same here
+                        //except I've never seen such videos. Just in case...
+                        result_url = 'hls:' + m[2];
+                    } else {
+                        result_url = 'hls:' + m[m.length - 1];
+                        showtime.notify(qualityNotAvailableError, 5);
+                    }
+                    break;
+                case '2':
+                    if (m[1]) {
+                        result_url = 'hls:' + m[1];
+                    } else {
+                        result_url = 'hls:' + m[m.length - 1];
+                    }
+                    break;
+                case '3':
+                    //let's assume that at least one item is available
+                    result_url = 'hls:' + m[0];
+                    break;
             }
         }
         //showtime.print("Video Link: " + result_url);
@@ -431,15 +450,37 @@
         showtime.print(message);
     }
 
-    function p(message) {
-        if (typeof(message) === 'object') message = showtime.JSONEncode(message);
-        showtime.print(message);
+    function p(msg) {
+        service.debug && ("object" === typeof msg && (msg = "### object ###\n" + showtime.JSONEncode(msg) + "\n### object ###"), showtime.print(msg))
+    };
+
+
+
+    function countDelay(delay, lastRequest) {
+        p('Getting difference between:' + lastRequest + " and " + Date.now());
+        var timeDiff = getTimeDifference(lastRequest, Date.now());
+        p("time sinse last call:" + timeDiff);
+        if (timeDiff < delay) {
+            //wait for the delay time to end
+            return delay - timeDiff;
+        } else {
+            return 0;
+        }
+    }
+
+    function sleep(milliseconds) {
+        var start = Date.now();
+        while (1)
+            if (Date.now() - start > milliseconds) break;
     }
 
     function getTimeDifference(startUnix, endUnix) {
         return endUnix - startUnix; //in milliseconds
     }
-    const blue = "6699CC", orange = "FFA500";
+
+
+    var blue = "6699CC",
+        orange = "FFA500";
 
     function colorStr(str, color) {
         return '<font color="' + color + '">(' + str + ')</font>';
@@ -469,30 +510,30 @@
             page.entries = 0;
             var offset = 0;
             var loader = function loader() {
-                    var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
-                        method: 'POST',
-                        headers: {
-                            'User-Agent': USER_AGENT
-                        },
-                        args: {
-                            id: 'filter-videos',
-                            category: 0,
-                            search: query,
-                            start: offset,
-                            limit: 20
-                        }
-                    }));
-                    for (var i in JSON.data) {
-                        page.appendItem(PREFIX + ':' + JSON.id + ':' + JSON.data[i].id + ':' + escape(JSON.data[i].title_ru + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : "")), "video", {
-                            title: showtime.entityDecode(unescape(JSON.data[i].title_ru)) + (JSON.data[i].title_en ? " / " + showtime.entityDecode(JSON.data[i].title_en) : "") + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : ""),
-                            year: +parseInt(JSON.data[i].year, 10),
-                            icon: unescape(JSON.data[i].image_file)
-                        });
-                        page.entries++;
+                var JSON = showtime.JSONDecode(showtime.httpReq(BASE_URL + '/backend/model.php', {
+                    method: 'POST',
+                    headers: {
+                        'User-Agent': USER_AGENT
+                    },
+                    args: {
+                        id: 'filter-videos',
+                        category: 0,
+                        search: query,
+                        start: offset,
+                        limit: 20
                     }
-                    offset += 20;
-                    return !JSON.endOfData;
-                };
+                }));
+                for (var i in JSON.data) {
+                    page.appendItem(PREFIX + ':' + JSON.id + ':' + JSON.data[i].id + ':' + escape(JSON.data[i].title_ru + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : "")), "video", {
+                        title: showtime.entityDecode(unescape(JSON.data[i].title_ru)) + (JSON.data[i].title_en ? " / " + showtime.entityDecode(JSON.data[i].title_en) : "") + (JSON.data[i].season ? " " + showtime.entityDecode(JSON.data[i].season) : ""),
+                        year: +parseInt(JSON.data[i].year, 10),
+                        icon: unescape(JSON.data[i].image_file)
+                    });
+                    page.entries++;
+                }
+                offset += 20;
+                return !JSON.endOfData;
+            };
             setPageHeader(page, query);
             loader();
             page.paginator = loader;
