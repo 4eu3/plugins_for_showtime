@@ -1,7 +1,7 @@
 /*
  *  ororo.tv  - Showtime Plugin
  *
- *  Copyright (C) 2014 Buksa, lprot
+ *  Copyright (C) 2015 Buksa, lprot
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,11 +16,12 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.7
+//ver 0.5.10
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
-    var BASE_URL = 'http://ororo.tv/';
+    var USER_AGENT = 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+    var BASE_URL = 'http://ororo.tv';
     var logo = plugin.path + plugin_info.icon;
     var loggedIn = false;
 
@@ -43,7 +44,7 @@
     var service = plugin.createService("Ororo.tv", PREFIX + ":start", "video", true, logo);
     //settings
     var settings = plugin.createSettings("Ororo.tv", logo, plugin_info.synopsis);
-    var main_menu_order = plugin.createStore('main_menu_order', true);
+    //var main_menu_order = plugin.createStore('main_menu_order', true);
     var items = [];
     var items_tmp = [];
     settings.createInfo("info", logo, "Plugin developed by " + plugin_info.author + ". \n");
@@ -70,7 +71,19 @@
     settings.createMultiOpt("Format", "Format", Format, function(v) {
         service.Format = v;
     });
-    p(showtime.currentVersionInt)
+    settings.createAction("logout", "Log out", function() {
+        var request = showtime.httpReq(BASE_URL + '/users/sign_out', {
+            noFollow: true,
+            headers: {
+                'Referer': BASE_URL,
+                'User-Agent': USER_AGENT
+
+            }
+        });
+
+        showtime.notify('Successfully logout from Orro.tv', 2);
+    });
+
     if (showtime.currentVersionInt >= 4 * 10000000 + 3 * 100000 + 261) {
         plugin.addItemHook({
             title: "Search in Another Apps",
@@ -89,12 +102,21 @@
     });
 
     function login(query, authenticity_token) {
+        var BASE_URL = showtime.httpReq('http://ororo.tv', {
+        method: 'HEAD',
+        noFollow: true,
+        headers: {
+            'User-Agent': USER_AGENT
+        }
+    }).headers.Location;
+        showtime.notify('Start login procedure from Ororo.tv', 5);
         if (loggedIn)
             return false;
         var reason = "Login required";
         var do_query = false;
         while (1) {
             var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
+            p('credentials:' + credentials)
             if (!credentials) {
                 if (query && !do_query) {
                     do_query = true;
@@ -102,34 +124,40 @@
                 }
                 return "No credentials";
             }
-            if (credentials.rejected)
-                return "Rejected by user";
-            var v = showtime.httpReq("http://ororo.tv/users/sign_in", {
-                postdata: {
-                    utf8: '✓',
-                    authenticity_token: authenticity_token,
-                    'user[email]': credentials.username,
-                    'user[password]': credentials.password,
-                    'user[remember_me]': 0,
-                    'user[remember_me]': 1
-                },
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.4 (KHTML, like Gecko) Chrome/22.0.1106.240 YaBrowser/1.5.1106.240 Safari/537.4',
-                    'Host': 'ororo.tv',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'ru,en;q=0.9'
-                }
-            }).toString();
+            if (credentials.rejected) return "Rejected by user"
 
-            if (v.match(/error message[\s\S]+?header'>([\s\S]+)</)) {
-                reason = v.match(/error message[\s\S]+?header'>([\s\S]+?)</)[1].trim()
-                p(reason)
+            try {
+                var v = showtime.httpReq(BASE_URL + "/users/sign_in", {
+                    // noFollow: true,
+                    postdata: {
+                        utf8: '✓',
+                        authenticity_token: authenticity_token,
+                        'user[email]': credentials.username,
+                        'user[password]': credentials.password,
+                        'user[remember_me]': 1
+                    },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'Host': 'ororo.tv',
+                        'Origin': 'http://ororo.tv',
+                        'Referer': BASE_URL + '/users/sign_in',
+                        'X-CSRF-Token': authenticity_token,
+                        'User-Agent': USER_AGENT,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).toString();
+
+
+            } catch (err) {
+                p(err.message)
+                reason = err.message
                 do_query = true;
                 continue;
             }
+
             showtime.trace('Logged in to Ororo.tv as user: ' + credentials.username);
             loggedIn = true;
-            return false;
+            return v;
         }
     }
     //First level start page
@@ -146,19 +174,39 @@
         pageMenu(page);
         items = [];
         items_tmp = [];
-        var v = showtime.httpReq(BASE_URL).toString()
-        if (v.match('error message')) {
+        var v = showtime.httpReq(BASE_URL + '/users/sign_in', {
+            method: 'GET',
+            headers: {
+                'User-Agent': USER_AGENT
+            }
+        }).toString()
+
+        if (/"email":"([^"]+)"/g.exec(v) == null) {
+            p('email == null')
             if (v.match(/<meta content="(.*?)" name="csrf-token"/))
                 var authenticity_token = v.match(/<meta content="(.*?)" name="csrf-token"/)[1]
-            login(true, authenticity_token)
+            v = login(true, authenticity_token)
+            if (v === 'Rejected by user') {
+                page.error('You need to sign in or sign up before continuing.');
+                return;
+            }
+
+
+
         }
-        var v = showtime.httpReq(BASE_URL).toString()
+
+        if (/"email":"([^"]+)"/g.exec(v)) {
+            page.appendItem("", "separator", {
+                title: new showtime.RichText("Log in as " + (/"email":"([^"]+)"/g.exec(v)[1]))
+
+            });
+        }
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
         var show = v.split("<div class='index show");
         for (i = 1; i < show.length; i++) {
             var title = trim(match(/<div class='title'>([^<]+)/, show[i], 1));
-            var url = match(/href="\/([^"]+)/, show[i], 1);
-            var icon = BASE_URL + match(/data-original="\/([^"]+)/, show[i], 1);
+            var url = match(/href="([^"]+)/, show[i], 1);
+            var icon = BASE_URL + match(/data-original="([^"]+)/, show[i], 1);
             var newest = match(/data-newest='([^']+)/, show[i], 1);
             var rating = +match(/class='star'>[\S\s]+?value'>([0-9]+(?:\.[0-9]*)?)</, show[i], 1);
             var item = page.appendItem(PREFIX + ":page:" + url, "video", {
@@ -173,28 +221,31 @@
             items.push(item);
             items_tmp.push(item);
         }
+
+
         try {
             for (i in items) {
                 items[i].id = i;
             }
+
             items_tmp = page.getItems();
+
             for (i = 0; i < items_tmp.length; i++) {
                 if (!items_tmp[i].id) delete items_tmp[i];
             }
-            items_tmp.sort(function(a, b) {
-                return b.newest > a.newest;
-            });
-            var order = (items_tmp);
-            for (i in order) {
-                items[order[i].id].moveBefore(i);
-            }
-            page.reorderer = function(item, before) {
-                item.moveBefore(before);
-                var items = page.getItems();
-                for (var i = 0; i < items.length; i++) {
-                    if (!items[i].id) delete items[i];
-                }
-            };
+            items_tmp.sort();
+
+            //var order = (items_tmp);
+            //for (i in order) {
+            //     items[order[i].id].moveBefore(i);
+            //}
+            //page.reorderer = function(item, before) {
+            //    item.moveBefore(before);
+            //    var items = page.getItems();
+            //    for (var i = 0; i < items.length; i++) {
+            //        if (!items[i].id) delete items[i];
+            //   }
+            //   };
         } catch (ex) {
             t("Error while parsing main menu order");
             e(ex);
@@ -227,11 +278,11 @@
             var rating = parseInt(match(/<div id='rating'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10) * 10;
             var duration = parseInt(match(/<div id='length'[\S\s]+?([0-9]+(?:\.[0-9]*)?)/, v, 1), 10);
             var genre = trim(match(/<div id='genres'>[\s\S]+?:<\/span>([\s\S]+?)</, v, 1));
-            var icon = match(/id="poster" src="\/(.+?)"/, v, 1);
+            var icon = match(/id="poster" src="(.+?)"/, v, 1);
             page.metadata.logo = BASE_URL + icon;
             page.metadata.title = title + " (" + year + ")";
             //<a href="#1-3" class="episode" data-href="/shows/planet-earth/videos/2946" data-id="2946" data-time="null">№3 Fresh Water</a>
-            var re = /<a href="#?([^-]+)-([^"]+)" [\S\s]+?data-href="\/([^"]+)[\S\s]+?>([^<]+)([\S\s]+?)<\/li/g;
+            var re = /<a href="#?([^-]+)-([^"]+)" [\S\s]+?data-href="([^"]+)[\S\s]+?>([^<]+)([\S\s]+?)<\/li/g;
             var m = re.execAll(v);
             page.loading = false;
             if (m.toString()) {
@@ -323,23 +374,28 @@
         //    title: "Sort by Date (Decrementing)",
         //    icon: plugin.path + "views/img/sort_date_dec.png"
         //});
-        page.appendAction("pageevent", "sortViewsDec", true, {
-            title: "Sort by Views (Decrementing)",
-            icon: plugin.path + "views/img/sort_views_dec.png"
+        //page.appendAction("pageevent", "sortViewsDec", true, {
+        //    title: "Sort by Views (Decrementing)",
+        //    icon: plugin.path + "views/img/sort_views_dec.png"
+        //});
+        page.appendAction("pageevent", "sortDefault", true, {
+            title: "Sort Default)",
+            icon: plugin.path + "views/img/sort_default.png"
         });
+
         page.appendAction("pageevent", "sortAlphabeticallyInc", true, {
             title: "Sort Alphabetically (Incrementing)",
             icon: plugin.path + "views/img/sort_alpha_inc.png"
         });
-        page.appendAction("pageevent", "sortAlphabeticallyDec", true, {
-            title: "Sort Alphabetically (Decrementing)",
-            icon: plugin.path + "views/img/sort_alpha_dec.png"
-        });
+        //page.appendAction("pageevent", "sortAlphabeticallyDec", true, {
+        //    title: "Sort Alphabetically (Decrementing)",
+        //    icon: plugin.path + "views/img/sort_alpha_dec.png"
+        //});
         var sorts = [
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
-            ["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
-            ["sortViewsDec", "Views (decrementing)"],
-            ["sortDateDec", "Published (decrementing)"],
+            //["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
+            //["sortViewsDec", "Views (decrementing)"],
+            //["sortDateDec", "Published (decrementing)"],
             ["sortDefault", "Default", true]
         ];
         page.options.createMultiOpt("sort", "Sort by...", sorts, function(v) {
@@ -347,24 +403,30 @@
         });
 
         function sortAlphabeticallyInc() {
-            var its = sort(items, "title", true);
-            pageUpdateItemsPositions(its);
+            var order = (items_tmp);
+            for (i in order) {
+                items[order[i].id].moveBefore(i);
+            }
+            //
+            //
+            //var its = sort(items, "title", true);
+            //pageUpdateItemsPositions(its);
         }
-
-        function sortAlphabeticallyDec() {
-            var its = sort(items, "title", false);
-            pageUpdateItemsPositions(its);
-        }
-
-        function sortViewsDec() {
-            var its = sort(items, "rating", false);
-            pageUpdateItemsPositions(its);
-        }
-
-        function sortDateDec() {
-            var its = sort(items, "newest", false);
-            pageUpdateItemsPositions(its);
-        }
+        //
+        //function sortAlphabeticallyDec() {
+        //    var its = sort(items, "title", false);
+        //    pageUpdateItemsPositions(its);
+        //}
+        //
+        //function sortViewsDec() {
+        //    var its = sort(items, "rating", false);
+        //    pageUpdateItemsPositions(its);
+        //}
+        //
+        //function sortDateDec() {
+        //    var its = sort(items, "newest", false);
+        //    pageUpdateItemsPositions(its);
+        //}
 
         function sortDefault() {
             for (var i in items_tmp) {
@@ -374,15 +436,15 @@
         page.onEvent('sortAlphabeticallyInc', function() {
             sortAlphabeticallyInc();
         });
-        page.onEvent('sortAlphabeticallyDec', function() {
-            sortAlphabeticallyDec();
-        });
-        page.onEvent('sortViewsDec', function() {
-            sortViewsDec();
-        });
-        page.onEvent('sortDateDec', function() {
-            sortDateDec();
-        });
+        //page.onEvent('sortAlphabeticallyDec', function() {
+        //    sortAlphabeticallyDec();
+        //});
+        //page.onEvent('sortViewsDec', function() {
+        //    sortViewsDec();
+        //});
+        //page.onEvent('sortDateDec', function() {
+        //    sortDateDec();
+        //});
         page.onEvent('sortDefault', function() {
             sortDefault();
         });
