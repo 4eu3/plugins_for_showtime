@@ -84,17 +84,20 @@
         showtime.notify('Successfully logout from Orro.tv', 2);
     });
 
-    if (showtime.currentVersionInt >= 4 * 10000000 + 3 * 100000 + 261) {
         plugin.addItemHook({
             title: "Search in Another Apps",
             itemtype: "video",
             handler: function(obj, nav) {
-                var title = obj.metadata.title;
+                var title = obj.metadata.title.toString();
                 title = title.replace(/<.+?>/g, "").replace(/\[.+?\]/g, "");
                 nav.openURL("search:" + title);
             }
         });
-    }
+ 
+    
+    
+    
+
     //set header and cookies for ororo.tv
     plugin.addHTTPAuth("http:\/\/.*ororo.tv.*", function(authreq) {
         authreq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
@@ -227,25 +230,32 @@
             for (i in items) {
                 items[i].id = i;
             }
-
             items_tmp = page.getItems();
-
+p(page.getItems())
             for (i = 0; i < items_tmp.length; i++) {
-                if (!items_tmp[i].id) delete items_tmp[i];
-            }
-            items_tmp.sort();
 
-            //var order = (items_tmp);
-            //for (i in order) {
-            //     items[order[i].id].moveBefore(i);
-            //}
-            //page.reorderer = function(item, before) {
-            //    item.moveBefore(before);
-            //    var items = page.getItems();
-            //    for (var i = 0; i < items.length; i++) {
-            //        if (!items[i].id) delete items[i];
-            //   }
-            //   };
+                
+               if (!items_tmp[i].id) delete items_tmp[i];
+                
+            }
+
+            items_tmp.sort(function(a, b) {
+               return cmp(b.newest, a.newest);
+            });
+p(items_tmp)            
+            var order = (items_tmp);
+            for (i in order) {
+            
+                items[order[i].id].moveBefore(i);
+            }
+            page.reorderer = function(item, before) {
+                item.moveBefore(before);
+                var items = page.getItems();
+                for (var i = 0; i < items.length; i++) {
+                    delete items[i].eventhandlers
+                    if (!items[i].id) delete items[i];
+                }
+            };
         } catch (ex) {
             t("Error while parsing main menu order");
             e(ex);
@@ -254,6 +264,20 @@
         page.contents = "items";
         page.loading = false;
     });
+    
+    
+    
+    function cmp (a, b) {
+    if (a < b)
+        return -1;
+    else if (a > b)
+        return +1;
+    else
+        return 0;
+}
+    
+    
+    
     plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
         page.type = "directory";
         var i, v, item;
@@ -374,28 +398,23 @@
         //    title: "Sort by Date (Decrementing)",
         //    icon: plugin.path + "views/img/sort_date_dec.png"
         //});
-        //page.appendAction("pageevent", "sortViewsDec", true, {
-        //    title: "Sort by Views (Decrementing)",
-        //    icon: plugin.path + "views/img/sort_views_dec.png"
-        //});
-        page.appendAction("pageevent", "sortDefault", true, {
-            title: "Sort Default)",
-            icon: plugin.path + "views/img/sort_default.png"
+        page.appendAction("pageevent", "sortViewsDec", true, {
+            title: "Sort by Views (Decrementing)",
+            icon: plugin.path + "views/img/sort_views_dec.png"
         });
-
         page.appendAction("pageevent", "sortAlphabeticallyInc", true, {
             title: "Sort Alphabetically (Incrementing)",
             icon: plugin.path + "views/img/sort_alpha_inc.png"
         });
-        //page.appendAction("pageevent", "sortAlphabeticallyDec", true, {
-        //    title: "Sort Alphabetically (Decrementing)",
-        //    icon: plugin.path + "views/img/sort_alpha_dec.png"
-        //});
+        page.appendAction("pageevent", "sortAlphabeticallyDec", true, {
+            title: "Sort Alphabetically (Decrementing)",
+            icon: plugin.path + "views/img/sort_alpha_dec.png"
+        });
         var sorts = [
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
-            //["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
-            //["sortViewsDec", "Views (decrementing)"],
-            //["sortDateDec", "Published (decrementing)"],
+            ["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
+            ["sortViewsDec", "Views (decrementing)"],
+            ["sortDateDec", "Published (decrementing)"],
             ["sortDefault", "Default", true]
         ];
         page.options.createMultiOpt("sort", "Sort by...", sorts, function(v) {
@@ -403,30 +422,24 @@
         });
 
         function sortAlphabeticallyInc() {
-            var order = (items_tmp);
-            for (i in order) {
-                items[order[i].id].moveBefore(i);
-            }
-            //
-            //
-            //var its = sort(items, "title", true);
-            //pageUpdateItemsPositions(its);
+            var its = sort(items, "title", true);
+            pageUpdateItemsPositions(its);
         }
-        //
-        //function sortAlphabeticallyDec() {
-        //    var its = sort(items, "title", false);
-        //    pageUpdateItemsPositions(its);
-        //}
-        //
-        //function sortViewsDec() {
-        //    var its = sort(items, "rating", false);
-        //    pageUpdateItemsPositions(its);
-        //}
-        //
-        //function sortDateDec() {
-        //    var its = sort(items, "newest", false);
-        //    pageUpdateItemsPositions(its);
-        //}
+
+        function sortAlphabeticallyDec() {
+            var its = sort(items, "title", false);
+            pageUpdateItemsPositions(its);
+        }
+
+        function sortViewsDec() {
+            var its = sort(items, "rating", false);
+            pageUpdateItemsPositions(its);
+        }
+
+        function sortDateDec() {
+            var its = sort(items, "newest", false);
+            pageUpdateItemsPositions(its);
+        }
 
         function sortDefault() {
             for (var i in items_tmp) {
@@ -436,15 +449,15 @@
         page.onEvent('sortAlphabeticallyInc', function() {
             sortAlphabeticallyInc();
         });
-        //page.onEvent('sortAlphabeticallyDec', function() {
-        //    sortAlphabeticallyDec();
-        //});
-        //page.onEvent('sortViewsDec', function() {
-        //    sortViewsDec();
-        //});
-        //page.onEvent('sortDateDec', function() {
-        //    sortDateDec();
-        //});
+        page.onEvent('sortAlphabeticallyDec', function() {
+            sortAlphabeticallyDec();
+        });
+        page.onEvent('sortViewsDec', function() {
+            sortViewsDec();
+        });
+        page.onEvent('sortDateDec', function() {
+            sortDateDec();
+        });
         page.onEvent('sortDefault', function() {
             sortDefault();
         });
@@ -452,20 +465,26 @@
 
     function pageUpdateItemsPositions(its) {
         for (var i in its) {
+            
             items[its[i].orig_index].moveBefore(i);
         }
     }
 
     function sort(items, field, reverse) {
+
         if (items.length === 0) return null;
         var its = [];
         for (var i in items) {
+            p(items[i])
             items[i].orig_index = i;
             its.push(items[i]);
+            p(its[i])
         }
+        
         its.sort(function(a, b) {
-            return b[field] > a[field];
+            return cmp(b[field], a[field]);
         });
+        p(its)
         if (reverse) its.reverse();
         return its;
     }
