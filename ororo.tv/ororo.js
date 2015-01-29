@@ -1,7 +1,7 @@
 /*
  *  ororo.tv  - Showtime Plugin
  *
- *  Copyright (C) 2015 Buksa, lprot
+ *  Copyright (C) 2014-2015 Buksa, lprot
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,15 +16,14 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5.10
+//ver 0.6
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
-    var USER_AGENT = 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+    var USER_AGENT = 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36';
     var BASE_URL = 'http://ororo.tv';
     var logo = plugin.path + plugin_info.icon;
     var loggedIn = false;
-
     var tos = 'The developer has no affiliation with the sites what so ever.\n';
     tos += 'Nor does he receive money or any other kind of benefits for them.\n\n';
     tos += 'The software is intended solely for educational and testing purposes,\n';
@@ -77,27 +76,19 @@
             headers: {
                 'Referer': BASE_URL,
                 'User-Agent': USER_AGENT
-
             }
         });
-
         showtime.notify('Successfully logout from Orro.tv', 2);
     });
-
-        plugin.addItemHook({
-            title: "Search in Another Apps",
-            itemtype: "video",
-            handler: function(obj, nav) {
-                var title = obj.metadata.title.toString();
-                title = title.replace(/<.+?>/g, "").replace(/\[.+?\]/g, "");
-                nav.openURL("search:" + title);
-            }
-        });
- 
-    
-    
-    
-
+    plugin.addItemHook({
+        title: "Search in Another Apps",
+        itemtype: "video",
+        handler: function(obj, nav) {
+            var title = obj.metadata.title.toString();
+            title = title.replace(/<.+?>/g, "").replace(/\[.+?\]/g, "");
+            nav.openURL("search:" + title);
+        }
+    });
     //set header and cookies for ororo.tv
     plugin.addHTTPAuth("http:\/\/.*ororo.tv.*", function(authreq) {
         authreq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.2; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
@@ -105,21 +96,20 @@
     });
 
     function login(query, authenticity_token) {
+        var v;
         var BASE_URL = showtime.httpReq('http://ororo.tv', {
-        method: 'HEAD',
-        noFollow: true,
-        headers: {
-            'User-Agent': USER_AGENT
-        }
-    }).headers.Location;
+            method: 'HEAD',
+            noFollow: true,
+            headers: {
+                'User-Agent': USER_AGENT
+            }
+        }).headers.Location;
         showtime.notify('Start login procedure from Ororo.tv', 5);
-        if (loggedIn)
-            return false;
+        if (loggedIn) return false;
         var reason = "Login required";
         var do_query = false;
         while (1) {
             var credentials = plugin.getAuthCredentials("Ororo.tv", reason, do_query);
-            p('credentials:' + credentials)
             if (!credentials) {
                 if (query && !do_query) {
                     do_query = true;
@@ -127,10 +117,9 @@
                 }
                 return "No credentials";
             }
-            if (credentials.rejected) return "Rejected by user"
-
+            if (credentials.rejected) return "Rejected by user";
             try {
-                var v = showtime.httpReq(BASE_URL + "/users/sign_in", {
+                v = showtime.httpReq(BASE_URL + "/users/sign_in", {
                     // noFollow: true,
                     postdata: {
                         utf8: '✓',
@@ -149,15 +138,12 @@
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 }).toString();
-
-
             } catch (err) {
-                p(err.message)
-                reason = err.message
+                p(err.message);
+                reason = err.message;
                 do_query = true;
                 continue;
             }
-
             showtime.trace('Logged in to Ororo.tv as user: ' + credentials.username);
             loggedIn = true;
             return v;
@@ -165,8 +151,9 @@
     }
     //First level start page
     plugin.addURI(PREFIX + ":start", function(page) {
-        var i, v, remember_user_token;
-        if (!service.tosaccepted) if (showtime.message(tos, true, true)) service.tosaccepted = 1;
+        var i, v, remember_user_token, authenticity_token;
+        if (!service.tosaccepted)
+            if (showtime.message(tos, true, true)) service.tosaccepted = 1;
             else {
                 page.error("TOS not accepted. plugin disabled");
                 return;
@@ -177,31 +164,24 @@
         pageMenu(page);
         items = [];
         items_tmp = [];
-        var v = showtime.httpReq(BASE_URL + '/users/sign_in', {
+        v = showtime.httpReq(BASE_URL + '/users/sign_in', {
             method: 'GET',
             headers: {
                 'User-Agent': USER_AGENT
             }
-        }).toString()
+        }).toString();
+        if (/"email":"([^"]+)"/g.exec(v) === null) {
 
-        if (/"email":"([^"]+)"/g.exec(v) == null) {
-            p('email == null')
-            if (v.match(/<meta content="(.*?)" name="csrf-token"/))
-                var authenticity_token = v.match(/<meta content="(.*?)" name="csrf-token"/)[1]
-            v = login(true, authenticity_token)
+            if (v.match(/<meta content="(.*?)" name="csrf-token"/)) authenticity_token = v.match(/<meta content="(.*?)" name="csrf-token"/)[1];
+            v = login(true, authenticity_token);
             if (v === 'Rejected by user') {
                 page.error('You need to sign in or sign up before continuing.');
                 return;
             }
-
-
-
         }
-
         if (/"email":"([^"]+)"/g.exec(v)) {
             page.appendItem("", "separator", {
                 title: new showtime.RichText("Log in as " + (/"email":"([^"]+)"/g.exec(v)[1]))
-
             });
         }
         page.metadata.title = new showtime.RichText((/<title>(.*?)<\/title>/.exec(v)[1]));
@@ -224,35 +204,26 @@
             items.push(item);
             items_tmp.push(item);
         }
-
-
         try {
             for (i in items) {
                 items[i].id = i;
             }
             items_tmp = page.getItems();
-p(page.getItems())
             for (i = 0; i < items_tmp.length; i++) {
-
-                
-               if (!items_tmp[i].id) delete items_tmp[i];
-                
+                if (!items_tmp[i].id) delete items_tmp[i];
             }
-
-            items_tmp.sort(function(a, b) {
-               return cmp(b.newest, a.newest);
-            });
-p(items_tmp)            
+            items_tmp.sort(SortBy({
+                newest: 0
+            }));
             var order = (items_tmp);
             for (i in order) {
-            
                 items[order[i].id].moveBefore(i);
             }
             page.reorderer = function(item, before) {
                 item.moveBefore(before);
                 var items = page.getItems();
                 for (var i = 0; i < items.length; i++) {
-                    delete items[i].eventhandlers
+                    //    delete items[i].eventhandlers
                     if (!items[i].id) delete items[i];
                 }
             };
@@ -264,20 +235,6 @@ p(items_tmp)
         page.contents = "items";
         page.loading = false;
     });
-    
-    
-    
-    function cmp (a, b) {
-    if (a < b)
-        return -1;
-    else if (a > b)
-        return +1;
-    else
-        return 0;
-}
-    
-    
-    
     plugin.addURI(PREFIX + ":page:(.*)", function(page, link) {
         page.type = "directory";
         var i, v, item;
@@ -316,7 +273,8 @@ p(items_tmp)
                             title: new showtime.RichText('Season ' + m[i][1])
                         });
                     }
-                    item = page.appendItem(PREFIX + ":play:" + m[i][3] + ':' + escape(m[i][4] + '|' + title + '|' + parseInt(m[i][1], 10) + '|' + parseInt(m[i][2], 10)), "video", {
+                    item = page.appendItem(PREFIX + ":play:" + m[i][3] + ':' + escape(m[i][4] + '|' + title + '|' + parseInt(m[i][1], 10) + '|' + parseInt(m[i][2], 10)),
+                        "video", {
                         title: new showtime.RichText(m[i][4]),
                         icon: BASE_URL + icon,
                         description: match(/plot'>([^<]+)/, m[i][5], 1) ? new showtime.RichText(match(/plot'>([^<]+)/, m[i][5], 1)) : '',
@@ -346,7 +304,6 @@ p(items_tmp)
         page.loading = true;
         page.metadata.logo = logo;
         var s = unescape(title).split('|');
-        var video = get_video_link(url);
         var videoparams = {
             no_fs_scan: true,
             title: unescape(s[1]),
@@ -354,23 +311,18 @@ p(items_tmp)
             episode: s[3],
             canonicalUrl: PREFIX + ":play:" + url + ":" + title,
             sources: [{
-                    url: video.url.replace('.webm', service.Format)
+                    url: []
                 }
             ],
-            subtitles: service.subs === true ? ([{
-                    url: video.sub,
-                    language: 'English',
-                    title: match(/subtitle\/.+?\/(.+)/, video.sub)
-                }
-            ]) : ''
+            subtitles: []
         };
+        videoparams = get_video_link(url, videoparams);
         page.source = "videoparams:" + showtime.JSONEncode(videoparams);
         page.loading = false;
         page.type = "video";
     });
 
-    function get_video_link(url) {
-        var video = [];
+    function get_video_link(url, videoparams) {
         try {
             var v = showtime.httpReq(BASE_URL + url, {
                 debug: service.debug,
@@ -379,14 +331,36 @@ p(items_tmp)
                     //    'Cookie': this.id+"; "+ this._ororo_session+'; '+remember_user_token+'; video=true;',
                     //   'Location':'http://static-ua.ororo.tv/uploads/video/file/15896/Almost.Human.S01E03.HDTV.x264-LOL.mp4'
                 }
-            });
-            video.url = match(/<source src='\/(.*?)' type='video/, v, 1) ? BASE_URL + match(/<source src='\/(.*?)' type='video/, v, 1) : match(/<source src='(.*?)' type='video/, v, 1);
-            //<track default kind='subtitles' label='en' src='/uploads/subtitle/file/19219/Bob_s_Burgers_-_01x05_-_Hamburger_Dinner_Theater.LOL.English.HI.C.updated.Addic7ed.com.srt' srclang='en'>
-            video.sub = BASE_URL + match(/subtitles'.[\s\S]{0,300} src='\/(.*)' srclang/, v, 1);
+            }).toString();
+            /**
+<video autoplay class='video-js vjs-default-skin' controls data-id='424' data-number='1' data-season='1' data-setup='{}' data-show='Suits' data-title='Suits Season 1 Episode 1' data-type='Video' data-watched-total='0' id='my_video' nativecontrolsfortouch='false' poster='/uploads/show/poster/36/thumb_MV5BMTQ0ODY1Nzg0MF5BMl5BanBnXkFtZTcwODA4NDA4Nw__.jpg' preload='metadata'>
+<source src='http://static-ca.ororo.tv/uploads/video/file/424/Suits_S01E01_-_Pilot.webm?video=true' type='video/webm'>
+<source src='http://static-ca.ororo.tv/uploads/video/file/424/Suits_S01E01_-_Pilot.mp4?video=true' type='video/mp4'>
+<track default kind='subtitles' label='en' src='/uploads/subtitle/file/5865/Suits_-_1x01_-_Pilot.720p.WEB-DL.en.srt' srclang='en'>
+<track kind='subtitles' label='ru' src='/uploads/subtitle/file/28700/suits.s01e01.hdtv.xvid.srt' srclang='ru'>
+</video>
+*/
+            var video_url = match(/<source src='\/(.*?)' type='video/, v, 1) ? BASE_URL + match(/<source src='\/(.*?)' type='video/, v, 1) : match(/<source src='(.*?)' type='video/, v, 1);
+            videoparams.sources = [{
+                    url: video_url.replace('.webm', service.Format)
+            }];
+            if (service.subs === true) {
+                var re = /subtitles'.*?label='([^']+)+.*?src='([^']+)/g;
+                var subtitles = re.exec(v);
+                while (subtitles) {
+                    p("Found subtitles:" + subtitles[1] + subtitles[2]);
+                    videoparams.subtitles.push({
+                        url: BASE_URL + subtitles[2],
+                        language: subtitles[1],
+                        title: subtitles[2].match(/file\/\d+\/([^']+)/)[1]
+                    });
+                    subtitles = re.exec(v);
+                }
+            }
         } catch (err) {
             e(err);
         }
-        return video;
+        return videoparams;
     }
 
     function pageMenu(page) {
@@ -411,33 +385,41 @@ p(items_tmp)
             icon: plugin.path + "views/img/sort_alpha_dec.png"
         });
         var sorts = [
+            ["sortDefault", "Default", true],
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
-            ["sortAlphabeticallyDec", "Alphabetically (Z->A)"],
             ["sortViewsDec", "Views (decrementing)"],
             ["sortDateDec", "Published (decrementing)"],
-            ["sortDefault", "Default", true]
+            ["sortAlphabeticallyDec", "Alphabetically (Z->A)"]
         ];
         page.options.createMultiOpt("sort", "Sort by...", sorts, function(v) {
             eval(v + "()");
         });
 
         function sortAlphabeticallyInc() {
-            var its = sort(items, "title", true);
+            var its = sort(items, {
+                title: 1
+            });
             pageUpdateItemsPositions(its);
         }
 
         function sortAlphabeticallyDec() {
-            var its = sort(items, "title", false);
+            var its = sort(items, {
+                title: 1
+            });
             pageUpdateItemsPositions(its);
         }
 
         function sortViewsDec() {
-            var its = sort(items, "rating", false);
+            var its = sort(items, {
+                rating: 0
+            });
             pageUpdateItemsPositions(its);
         }
 
         function sortDateDec() {
-            var its = sort(items, "newest", false);
+            var its = sort(items, {
+                newest: 0
+            });
             pageUpdateItemsPositions(its);
         }
 
@@ -465,32 +447,59 @@ p(items_tmp)
 
     function pageUpdateItemsPositions(its) {
         for (var i in its) {
-            
             items[its[i].orig_index].moveBefore(i);
         }
     }
+    //function sort(items, field, reverse) {
 
-    function sort(items, field, reverse) {
-
+    function sort(items, field) {
         if (items.length === 0) return null;
         var its = [];
         for (var i in items) {
-            p(items[i])
             items[i].orig_index = i;
             its.push(items[i]);
-            p(its[i])
         }
-        
-        its.sort(function(a, b) {
-            return cmp(b[field], a[field]);
-        });
-        p(its)
-        if (reverse) its.reverse();
+        its.sort(SortBy(field));
         return its;
     }
     //
     //extra functions
     //
+    //*** This code is copyright 2004 by Gavin Kistner, !@phrogz.net
+    //*** It is covered under the license viewable at http://phrogz.net/JS/_ReuseLicense.txt
+    //*** Reuse or modification is free provided you abide by the terms of that license.
+    //*** (Including the first two lines above in your source code mostly satisfies the conditions.)
+    // Returns a function which can be used to sort an Array by multiple criteria.
+    // Can be called in one of three ways:
+    //   var sortFunc = SortBy( 'name' , 'age' , 'sex' );
+    //   var sortFunc = SortBy( ['name','age','sex'] );
+    //   var sortFunc = SortBy( { name:1, age:1, sex:1 } );
+    //
+    // The first two methods are equivalent, and sort in ascending order.
+    // The last method allows you to specify sort direction:
+    //   1 (or true)  specifies ascending sort order.
+    //   0 (or false) specifies descending sort order.
+    //
+    // The sort function is constructed using 'dot notation' for the properties;
+    // this means you can also specify a method to call on the object by putting
+    // parentheses at the end of the name.
+    // e.g. var stupidDateStringSort = SortBy('toDateString()','toTimeString()');
+
+    function SortBy() {
+        var a = arguments,
+            len = a.length,
+            f = 'return ',
+            p = 1,
+            i;
+        if (len == 1 && (a[0].constructor == Object || a[0].constructor == Array) && ((o = a = a[0]).constructor == Object)) p = 0;
+        if (p && (o = {}))
+            for (i = 0, len = a.length; i < len; i++) o[a[i]] = 1;
+        for (k in o) {
+            var z = o[k] ? ['<', '>'] : ['>', '<'];
+            f += 'a.' + k + z[0] + 'b.' + k + '?-1:a.' + k + z[1] + 'b.' + k + '?1:';
+        }
+        return new Function('a', 'b', f + '0');
+    }
     // Add to RegExp prototype
     RegExp.prototype.execAll = function(string) {
         var matches = [];
