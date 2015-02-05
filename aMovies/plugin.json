@@ -1,14 +1,15 @@
 {
+	"type": "ecmascript",
+	"apiversion": 1,
 	"id": "aMovies",
-	"version": "0.4",
-	"type": "javascript",
+	"file": "aMovies.js",
+	"showtimeVersion": "4.8",
+	"version": "0.5",
 	"author": "Buksa",
-	"showtimeVersion": "4.6",
 	"title": "aMovies",
-	"synopsis": "aMovies - video from VK",
-	"description":"<p>aMovies - Showtime plugin is the integration of the website <a href=\"http://amovies.tv\">aMovies.tv into Showtime</p>",
-	"homepage":"https://github.com/Buksa/plugins_for_showtime/aMovies",
-	"category": "video",
 	"icon": "logo.png",
-	"file": "aMovies.js"
+	"synopsis": "aMovies.tv - фильмы, сериалы и мультфильмы онлайн в HD.",
+	"description": "<p>aMovies - Showtime plugin is the integration of the website <a href=\"http://aMovies.tv\">aMovies.tv</a> into Showtime",
+	"category": "video",
+	"homepage": "https://github.com/Buksa"
 }
