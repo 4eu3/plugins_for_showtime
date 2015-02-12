@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.5
+//ver 0.5.1
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -99,6 +99,10 @@
                 title: ('Дальше больше') + ' ►',
                 icon: logo
             });
+            //page.appendItem(PREFIX + ":browse:" + m[i][2], "directory", {
+            //    title: ('Дальше большеbrowse') + ' ►',
+            //    icon: logo
+            //});
         }
         //Мультфильмы
         page.appendItem("", "separator", {
@@ -190,7 +194,7 @@
             var delay = countDelay(service.requestMinDelay * 1000, lastRequest);
             var loadItems = function() {
                 try {
-                    lastRequest = showtime.time();
+                    lastRequest = Date.now();
                     requestFinished = false;
                     p("Time to make some requests now!");
                     //make request here
@@ -408,7 +412,7 @@
                 // var JSON = showtime.JSONDecode(showtime.httpReq('http://query.yahooapis.com/v1/public/yql?q=use%20%22store%3A%2F%2FcruFRRY1BVjVHmIw4EPyYu%22%20as%20Untitled%3B%20SELECT%20Series.seriesid%20FROM%20Untitled%20WHERE%20seriesname%3D%22'+encodeURIComponent(s[0].trim())+'%22%20and%20language%3D%22ru%22%20|%20truncate%28count%3D1%29&format=json'))
                 p('serials' + '\n' + link);
                 //re = /value=(?:"http:\/\/vk.com\/|"http:\/\/rutube.ru\/|"http:\/\/videoapi.my.mail.ru\/)([^"]+)[\S\s]+?>([^<]+)/g;
-                re = /value=(?:".*?)(vk.com[^"]+|videoapi.my.mail.ru\/[^"]+)[\S\s]+?>([^<]+)/g;
+                re = /value=(?:".*?)(oid=.+?&id=.+?&hash=[^&]+|videoapi.my.mail.ru\/[^"]+)[\S\s]+?>([^<]+)/g;
                 m = re.execAll(v);
                 if (m.toString()) {
                     for (i = 0; i < m.length; i++) {
@@ -531,7 +535,7 @@
         if (data.url.indexOf('ideoapi.my.mail.ru') !== -1) {
             v = showtime.httpGet('http://' + data.url);
             // var video_key = getCookie('video_key',v.multiheaders)
-
+            //https://api.vk.com/method/video.getEmbed?oid=-86688251&video_id=170996975&embed_hash=1c63dad9f125d575&hd=2
             var json = JSON.parse(showtime.httpGet(/metadataUrl":"([^"]+)/.exec(v)[1]));
             for (i in json.videos) {
                 videoparams.sources = [{
@@ -539,6 +543,7 @@
                         mimetype: 'video/quicktime'
                     }
                 ]
+                data.video_url = json.videos[i].url
                 videoparams.title = json.meta.title
                 video = "videoparams:" + JSON.stringify(videoparams);
                 page.appendItem(video, "video", {
@@ -546,7 +551,50 @@
                     duration: json.meta.duration,
                     icon: json.meta.poster
                 })
+                page.appendItem(PREFIX + ':' + 'video' + ':' + escape(showtime.JSONEncode(data)), "video", {
+                    title: 'video:[' + json.videos[i].key + ']-' + json.meta.title,
+                    duration: json.meta.duration,
+                    icon: json.meta.poster
+                })
+
             }
+            page.dump()
+            page.appendItem("search:" + data.title, "directory", {
+                title: 'найти ' + data.title
+            });
+            page.type = "directory";
+            page.loading = false;
+        }
+        p('sssssssssssssssssssssssssssssssssssssssssssssssss')
+        p(data.url.indexOf('oid='))
+
+        if (data.url.indexOf('oid=') !== -1) {
+
+            vars = JSON.parse(showtime.httpReq('https://api.vk.com/method/video.getEmbed?' + data.url.replace('&id', '&video_id').replace('&hash', '&embed_hash')).toString());
+            p(vars)
+            if (vars.error) {
+                page.metadata.title = vars.error.error_msg
+                showtime.notify(vars.error.error_msg + '\n' + 'This video has been removed from public access.', 3)
+
+            } else {
+                for (key in vars.response) {
+                    if (key == 'cache240' || key == 'cache360' || key == 'cache480' || key == 'cache720' || key == 'url240' || key == 'url360' || key == 'url480' || key == 'url720') {
+                        videoparams.sources = [{
+                                url: vars.response[key],
+                                mimetype: "video/quicktime"
+                            }
+                        ]
+                        video = "videoparams:" + JSON.stringify(videoparams)
+                        page.appendItem(video, "video", {
+                            title: "[" + key.match(/\d+/g) + "]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f",
+                            duration: vars.response.duration,
+                            icon: vars.response.thumb
+                        });
+                    }
+                }
+            }
+
+
             page.appendItem("search:" + data.title, "directory", {
                 title: 'найти ' + data.title
             });
@@ -554,34 +602,40 @@
             page.loading = false;
         }
 
+        page.metadata.logo = logo;
+        page.loading = false;
+    });
 
-        if (data.url.indexOf('video_ext.php') !== -1) {
-            v = showtime.httpGet('http://' + data.url).toString();
-            if (v.indexOf('This video has been removed from public access.') !== -1) showtime.notify('This video has been removed from public access.', 3)
-            else {
-                vars = JSON.parse(/var vars = (.+)/.exec(v)[1]);
-                p(vars)
+    plugin.addURI(PREFIX + ":video:(.*)", function(page, data) {
+        p(PREFIX + ":play:" + (data))
+        //data = showtime.JSONDecode(unescape(data));
+        data = JSON.parse(unescape(data));
+        page.loading = true;
 
+        var videoparams = {
+            canonicalUrl: '',
+            no_fs_scan: true,
+            title: data.eng_title,
+            year: data.year ? data.year : 0,
+            season: data.season ? data.season : -1,
+            episode: data.episode ? data.episode : -1,
+            sources: [{
+                    url: data.video_url
+                }
+            ],
+            subtitles: []
+        };
 
-
-vars.url720 && (videoparams.sources = [{url:vars.url720, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[720p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.url480 && (videoparams.sources = [{url:vars.url480, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[480p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.url360 && (videoparams.sources = [{url:vars.url360, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[360p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.url240 && (videoparams.sources = [{url:vars.url240, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[240p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.cache720 && (videoparams.sources = [{url:vars.cache720, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[cache720p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.cache480 && (videoparams.sources = [{url:vars.cache480, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[cache480p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.cache360 && (videoparams.sources = [{url:vars.cache360, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[cache360p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-vars.cache240 && (videoparams.sources = [{url:vars.cache240, mimetype:"video/quicktime"}], video = "videoparams:" + JSON.stringify(videoparams), page.appendItem(video, "video", {title:"[cache240p]-" + data.title + " | " + data.season + " \u0441\u0435\u0437\u043e\u043d  | " + data.episode + " \u0441\u0435\u0440\u0438\u044f", duration:vars.duration, icon:vars.thumb}));
-
-            }
-
-            page.appendItem("search:" + data.title, "directory", {
-                title: 'найти ' + data.title
-            });
-            page.type = "directory";
-            page.loading = false;
+        if (showtime.probe(data.video_url).result === 0) {
+            data.video_url = undefined
+            data = escape(JSON.stringify(data))
+            videoparams.canonicalUrl = PREFIX + ":play:" + (data);
+            p(videoparams.canonicalUrl)
+            page.type = "video";
+            page.source = "videoparams:" + JSON.stringify(videoparams)
+        } else {
+            showtime.notify('video', 3);
         }
-
         page.metadata.logo = logo;
         page.loading = false;
     });
@@ -614,6 +668,54 @@ vars.cache240 && (videoparams.sources = [{url:vars.cache240, mimetype:"video/qui
             e(err);
         }
     });
+
+
+
+
+
+    //showtime.httpReq('https://api.vk.com/method/video.getEmbed', {args : ajaxParams}, function(result) {
+    //  if (result.response) {
+    //    if (!is_mobile()) {
+    //      var flashvars = ['nologo=1','md_author=UPFY.ORG � Video Search'];
+    //
+    //      each(result.response, function(key, value) {
+    //        if (key !== 'md_author' && key !== 'nologo') {
+    //          flashvars.push(key + '=' + euc(value));
+    //        }
+    //      });
+    //
+    //      video_wrapper.innerHTML = '<embed type="application/x-shockwave-flash" name="video_player" width="100%" height="100%" preventhide="1" quality="high" flashvars="' + flashvars.join('&amp;') + '" allowfullscreen="true" allowscriptaccess="always" bgcolor="#000000" wmode="opaque" src="/video.swf?45">';
+    //    } else {
+    //      var sources = [], videos = [], poster = result.response.jpg;
+    //
+    //      if (result.response.cache240 || result.response.cache360 || result.response.cache480 || result.response.cache720) {
+    //        each(result.response, function(key, value) {
+    //          if (key == 'cache240' || key == 'cache360' || key == 'cache480' || key == 'cache720') {
+    //            sources.push('<source src="'+value+'" type="video/mp4"></source>');
+    //            videos.push('<a href="'+value+'">'+key.replace('cache', '')+'</a>');
+    //          }
+    //        });
+    //      } else {
+    //        each(result.response, function(key, value) {
+    //          if (key == 'url240' || key == 'url360' || key == 'url480' || key == 'url720') {
+    //            sources.push('<source src="'+value+'" type="video/mp4"></source>');
+    //            videos.push('<a href="'+value+'">'+key.replace('url', '')+'</a>');
+    //          }
+    //        });
+    //      }
+    //
+    //      video_wrapper.innerHTML = '\
+    //        <video class="vv_inline_video" width="100%" height="100%" preload="none" controls="controls" poster="'+poster+'">\
+    //          '+sources.join('\n')+'\
+    //          <img src="'+poster+'" alt="">\
+    //          <div class="vv_not_support">The device does not support HTML5 video.<br />Download video: <div class="vv_download">'+videos.join(' ')+'</div></div>\
+    //        </video>';
+    //    }
+    //  } else {
+    //    video_wrapper.innerHTML = '<iframe preventhide="0" scrolling="no" width="100%" height="100%" style="overflow: hidden;" src="' + iframeParams.src + '" frameborder="0" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>';
+    //  }
+    //});
+
 
     //function get_video_link(url) {
     //    var JSON, v, result_url;
@@ -781,28 +883,23 @@ vars.cache240 && (videoparams.sources = [{url:vars.cache240, mimetype:"video/qui
         return false;
     }
     // Add to RegExp prototype
-    RegExp.prototype.execAll = function(string) {
-        var matches = [];
-        var match = null;
-        while ((match = this.exec(string)) !== null) {
-            var matchArray = [];
-            for (var i in match) {
-                if (parseInt(i, 10) == i) {
-                    matchArray.push(match[i]);
-                }
+    RegExp.prototype.execAll = function(e) {
+        for (var c = [], b = null; null !== (b = this.exec(e));) {
+            var d = [],
+                a;
+            for (a in b) {
+                parseInt(a, 10) == a && d.push(b[a]);
             }
-            matches.push(matchArray);
+            c.push(d);
         }
-        return matches;
+        return c;
     };
 
-    function match(re, st, i) {
-        st = st.toString();
-        i = typeof i !== 'undefined' ? i : 0;
-        if (re.exec(st)) {
-            return re.exec(st)[i];
-        } else return '';
-    }
+    function match(c, a, b) {
+        a = a.toString();
+        b = "undefined" !== typeof b ? b : 0;
+        return c.exec(a) ? c.exec(a)[b] : "";
+    };
 
     function trim(s) {
         s = s.toString();
@@ -847,18 +944,10 @@ vars.cache240 && (videoparams.sources = [{url:vars.cache240, mimetype:"video/qui
     //time stuff
 
     function countDelay(delay, lastRequest) {
-        //showtime.print('Getting difference between:' + lastRequest + " and " + showtime.time());
-        var timeDiff = getTimeDifference(lastRequest, showtime.time()) * 1000;
-        //showtime.print("time sinse last call:" + timeDiff);
-        if (timeDiff < delay) {
-            //wait for the delay time to end
-            return delay - timeDiff;
-        } else {
-            return 0;
-        }
-    }
+        p("Getting difference between:" + lastRequest + " and " + Date.now());
+        var timeDiff = Date.now() - lastRequest;
+        p("time sinse last call:" + timeDiff);
+        return timeDiff < delay ? delay - timeDiff : 0;
+    };
 
-    function getTimeDifference(startUnix, endUnix) {
-        return endUnix - startUnix; //in milliseconds
-    }
 })(this);
