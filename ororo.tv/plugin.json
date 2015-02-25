@@ -3,13 +3,13 @@
 	"apiversion": 1,
 	"id": "ororo",
 	"file": "ororo.js",
-	"showtimeVersion": "4.8",
-	"version": "0.6",
+	"showtimeVersion": "4.9",
+	"version": "0.6.1",
 	"author": "Buksa,lprot",
 	"title": "ororo.tv",
 	"icon": "logo.png",
-	"synopsis": "Showtime plugin to watch tv shows from ororo.tv",
-	"description": "<p>Ororo.tv Showtime plugin is the integration of the website ororo.tv into Showtime.\n\nTV Shows in English with English subtitles<p>",
+	"synopsis": "Movian plugin to watch tv shows from ororo.tv",
+	"description": "<p>Ororo.tv - plugin is the integration of the website ororo.tv.\n\nTV Shows in English with English subtitles<p>",
 	"category": "video",
 	"homepage": "https://github.com/Buksa/plugins_for_showtime/ororo"
 }

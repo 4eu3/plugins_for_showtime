@@ -1,5 +1,5 @@
 /*
- *  ororo.tv  - Showtime Plugin
+ *  ororo.tv  - Movian Plugin
  *
  *  Copyright (C) 2014-2015 Buksa, lprot
  *
@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.6
+//ver 0.6.1
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -97,13 +97,13 @@
 
     function login(query, authenticity_token) {
         var v;
-        var BASE_URL = showtime.httpReq('http://ororo.tv', {
-            method: 'HEAD',
-            noFollow: true,
-            headers: {
-                'User-Agent': USER_AGENT
-            }
-        }).headers.Location;
+        //var BASE_URL = showtime.httpReq('http://ororo.tv', {
+        //    method: 'HEAD',
+        //    noFollow: true,
+        //    headers: {
+        //        'User-Agent': USER_AGENT
+        //    }
+        //}).headers.Location;
         showtime.notify('Start login procedure from Ororo.tv', 5);
         if (loggedIn) return false;
         var reason = "Login required";
@@ -119,7 +119,7 @@
             }
             if (credentials.rejected) return "Rejected by user";
             try {
-                v = showtime.httpReq(BASE_URL + "/users/sign_in", {
+                v = showtime.httpReq(BASE_URL+'/users/sign_in', {
                     // noFollow: true,
                     postdata: {
                         utf8: '✓',
@@ -132,7 +132,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                         'Host': 'ororo.tv',
                         'Origin': 'http://ororo.tv',
-                        'Referer': BASE_URL + '/users/sign_in',
+                        'Referer': BASE_URL,
                         'X-CSRF-Token': authenticity_token,
                         'User-Agent': USER_AGENT,
                         'X-Requested-With': 'XMLHttpRequest'
@@ -170,6 +170,7 @@
                 'User-Agent': USER_AGENT
             }
         }).toString();
+        p(v)
         if (/"email":"([^"]+)"/g.exec(v) === null) {
 
             if (v.match(/<meta content="(.*?)" name="csrf-token"/)) authenticity_token = v.match(/<meta content="(.*?)" name="csrf-token"/)[1];
@@ -192,6 +193,7 @@
             var icon = BASE_URL + match(/data-original="([^"]+)/, show[i], 1);
             var newest = match(/data-newest='([^']+)/, show[i], 1);
             var rating = +match(/class='star'>[\S\s]+?value'>([0-9]+(?:\.[0-9]*)?)</, show[i], 1);
+            var lastupdated = match(/data-lastupdated='([^']+)/, show[i], 1)
             var item = page.appendItem(PREFIX + ":page:" + url, "video", {
                 title: new showtime.RichText(title /*+ ' | ' + trim(m[i][6])*/ ),
                 description: new showtime.RichText(match(/class='title'>[\s\S]+?<\/div>([\s\S]+?)<\/div>/, show[i], 1)),
@@ -199,6 +201,7 @@
                 rating: rating * 10
             });
             item.title = title;
+            item.lastupdated = lastupdated;
             item.newest = newest;
             item.rating = rating;
             items.push(item);
@@ -213,7 +216,7 @@
                 if (!items_tmp[i].id) delete items_tmp[i];
             }
             items_tmp.sort(SortBy({
-                newest: 0
+                lastupdated: 0
             }));
             var order = (items_tmp);
             for (i in order) {
@@ -317,7 +320,7 @@
             subtitles: []
         };
         videoparams = get_video_link(url, videoparams);
-        page.source = "videoparams:" + showtime.JSONEncode(videoparams);
+        page.source = "videoparams:" + JSON.stringify(videoparams);
         page.loading = false;
         page.type = "video";
     });
@@ -384,7 +387,16 @@
             title: "Sort Alphabetically (Decrementing)",
             icon: plugin.path + "views/img/sort_alpha_dec.png"
         });
+        
+//data-category="popularity"> Popularity
+//data-category="lastupdated">Last updated
+//data-category="newest">Last added
+//data-category="imdb">By rating
+//data-category="alphabetical">By name
+//data-category="latest">By year
+
         var sorts = [
+            ["sortDefault", "Default", true],
             ["sortDefault", "Default", true],
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
             ["sortViewsDec", "Views (decrementing)"],
@@ -532,7 +544,7 @@
     }
 
     function getCookie(name, multiheaders) {
-        var cookie = showtime.JSONEncode(multiheaders['Set-Cookie']);
+        var cookie = JSON.stringify(multiheaders['Set-Cookie']);
         p('cookie: ' + cookie);
         var matches = cookie.match(new RegExp('(?:^|; |","|")' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
         return matches ? name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=' + decodeURIComponent(matches[1]) : false;
@@ -563,7 +575,7 @@
     }
 
     function p(message) {
-        if (typeof(message) === 'object') message = showtime.JSONEncode(message);
+        if (typeof(message) === 'object') message = JSON.stringify(message);
         if (service.debug) showtime.print(message);
     }
 
