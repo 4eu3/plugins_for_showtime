@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//ver 0.6.1
+//ver 0.6.2
 (function(plugin) {
     var plugin_info = plugin.getDescriptor();
     var PREFIX = plugin_info.id;
@@ -252,7 +252,8 @@
                     'Referer': 'http://ororo.tv/' //,
                     //   'Cookie':this.id+'; '+this._ororo_session+'; '+this.remember_user_token
                 }
-            });
+            }).toString();
+            p(v)
             var title = showtime.entityDecode(trim(match(/<img alt="(.+?)" id="poster"/, v, 1)));
             if (service.arrayview) {
                 page.metadata.background = bg(title);
@@ -265,20 +266,25 @@
             var icon = match(/id="poster" src="(.+?)"/, v, 1);
             page.metadata.logo = BASE_URL + icon;
             page.metadata.title = title + " (" + year + ")";
+//            <a data-href="/en/shows/rizzoli-isles/videos/20812" data-id="20812" data-time="null" class="episode" href="#5-7">№7 Boston Keltic</a>
+
             //<a href="#1-3" class="episode" data-href="/shows/planet-earth/videos/2946" data-id="2946" data-time="null">№3 Fresh Water</a>
+            
             var re = /<a href="#?([^-]+)-([^"]+)" [\S\s]+?data-href="([^"]+)[\S\s]+?>([^<]+)([\S\s]+?)<\/li/g;
+            
+            var re = /data-href="([^"]+).+?data-id="(\d+).+?href="#(\d+)-(\d+).+?>([^<]+)/g
             var m = re.execAll(v);
             page.loading = false;
             if (m.toString()) {
                 for (i = 0; i < m.length; i++) {
-                    if (m[i][2] == '1') {
+                    if (m[i][4] == '1') {
                         page.appendItem("", "separator", {
-                            title: new showtime.RichText('Season ' + m[i][1])
+                            title: new showtime.RichText('Season ' + m[i][3])
                         });
                     }
-                    item = page.appendItem(PREFIX + ":play:" + m[i][3] + ':' + escape(m[i][4] + '|' + title + '|' + parseInt(m[i][1], 10) + '|' + parseInt(m[i][2], 10)),
+                    item = page.appendItem(PREFIX + ":play:" + m[i][1] + ':' + escape(m[i][5] + '|' + title + '|' + parseInt(m[i][3], 10) + '|' + parseInt(m[i][4], 10)),
                         "video", {
-                        title: new showtime.RichText(m[i][4]),
+                        title: new showtime.RichText(m[i][5]),
                         icon: BASE_URL + icon,
                         description: match(/plot'>([^<]+)/, m[i][5], 1) ? new showtime.RichText(match(/plot'>([^<]+)/, m[i][5], 1)) : '',
                         rating: rating,
@@ -289,8 +295,8 @@
                     if (service.thetvdb) {
                         item.bindVideoMetadata({
                             title: trim(title),
-                            season: parseInt(m[i][1], 10),
-                            episode: parseInt(m[i][2], 10)
+                            season: parseInt(m[i][3], 10),
+                            episode: parseInt(m[i][4], 10)
                         });
                     }
                 }
@@ -396,7 +402,6 @@
 //data-category="latest">By year
 
         var sorts = [
-            ["sortDefault", "Default", true],
             ["sortDefault", "Default", true],
             ["sortAlphabeticallyInc", "Alphabetically (A->Z)"],
             ["sortViewsDec", "Views (decrementing)"],
