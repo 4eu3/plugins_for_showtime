@@ -31,7 +31,7 @@
     });
 
     //settings.createString("M3u Playlist", "playlist Source", "https://dl.dropboxusercontent.com/u/94263272/pl.txt", function(v) {
-    settings.createString("Playlist", "playlist Source", "http://peers.tv/services/iptv/playlist.m3u", function(v) {
+    settings.createString("Playlist", "playlist Source", "http://peerstv.ufanet.ru/playlist.m3u", function(v) {
         service.pl = v;
     });
 
